@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Memory/AddressResolver.hpp"
+#include "Core/Platform.hpp"
 
 namespace Core
 {
@@ -11,7 +12,11 @@ public:
 
     inline static uintptr_t GetImageBase()
     {
+#if defined(_WIN32) || defined(_WIN64)
         static const auto base = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+#else
+        static const auto base = Core::Platform::GetImageBase();
+#endif
         return base;
     }
 };

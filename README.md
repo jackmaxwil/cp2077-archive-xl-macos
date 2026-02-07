@@ -1,4 +1,6 @@
-# ArchiveXL
+# ArchiveXL (macOS Port)
+
+> **⚠️ macOS-only fork/port.** For Windows, use the original: [psiberx/cp2077-archive-xl](https://github.com/psiberx/cp2077-archive-xl)
 
 ArchiveXL is a modding tool that allows you to load custom resources without touching original game files,
 thus allowing multiple mods to expand same resources without conflicts.
@@ -16,7 +18,9 @@ With the mod you can:
 
 ### Compatibility
 
-- Cyberpunk 2077 2.31
+- Cyberpunk 2077 **macOS v2.3.1**
+- Apple Silicon (arm64)
+- [RED4ext macOS port](https://github.com/memaxo/RED4ext) installed and working
 - [redscript](https://github.com/jac3km4/redscript) 0.5.31+
 
 ### Installation
@@ -26,6 +30,11 @@ With the mod you can:
 2. Extract the release archive `ArchiveXL-x.x.x.zip` into the Cyberpunk 2077 directory.
 
 ## Documentation
+
+- **macOS port docs**
+  - `docs/STATUS.md` (current status)
+  - `docs/MACOS_ADDRESS_DISCOVERY.md` (address discovery pipeline + current gaps)
+  - `docs/MACOS_PORTING_AUDIT.md` (original porting feasibility/audit)
 
 - [Dynamic appearances](https://github.com/psiberx/cp2077-archive-xl/wiki#dynamic-appearances)
 - [Body types](https://github.com/psiberx/cp2077-archive-xl/wiki#body-types)

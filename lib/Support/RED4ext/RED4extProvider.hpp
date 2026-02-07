@@ -48,25 +48,44 @@ public:
 
     auto RegisterScripts(const std::filesystem::path& aPath)
     {
+#if defined(_WIN32) || defined(_WIN64)
         m_sdk->scripts->Add(m_plugin, aPath.c_str());
+#else
+        // macOS: Avoid UB from iterators into different temporaries.
+        // Also avoid throwing conversions for non-ASCII paths by using the filesystem-native wide string.
+        if (m_sdk && m_sdk->scripts && m_sdk->scripts->Add)
+        {
+            const std::wstring widePath = aPath.wstring();
+            m_sdk->scripts->Add(m_plugin, widePath.c_str());
+        }
+#endif
         return Defer(this);
     }
 
     auto RegisterNeverRefType(const char* aType)
     {
-        m_sdk->scripts->RegisterNeverRefType(aType);
+        if (m_sdk && m_sdk->scripts && m_sdk->scripts->RegisterNeverRefType)
+        {
+            m_sdk->scripts->RegisterNeverRefType(aType);
+        }
         return Defer(this);
     }
 
     auto RegisterMixedRefType(const char* aType)
     {
-        m_sdk->scripts->RegisterMixedRefType(aType);
+        if (m_sdk && m_sdk->scripts && m_sdk->scripts->RegisterMixedRefType)
+        {
+            m_sdk->scripts->RegisterMixedRefType(aType);
+        }
         return Defer(this);
     }
 
     auto ConfigureScripts(std::function<void(const RED4ext::Scripts*)> aConfig)
     {
-        aConfig(m_sdk->scripts);
+        if (m_sdk && m_sdk->scripts)
+        {
+            aConfig(m_sdk->scripts);
+        }
         return Defer(this);
     }
 

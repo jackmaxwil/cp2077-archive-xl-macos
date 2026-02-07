@@ -59,7 +59,7 @@ Red::CName App::Language::ResolveFromTextResource(Red::ResourcePath aPath)
     if (it == s_codes.end())
         return {};
 
-    return it.value();
+    return it->second;
 }
 
 Red::CName App::Language::ResolveFromSubtitleResource(Red::ResourcePath aPath)
@@ -92,7 +92,7 @@ Red::CName App::Language::ResolveFromSubtitleResource(Red::ResourcePath aPath)
     if (it == s_codes.end())
         return {};
 
-    return it.value();
+    return it->second;
 }
 
 Red::CName App::Language::ResolveFromLipsyncResource(Red::ResourcePath aPath)
@@ -125,5 +125,5 @@ Red::CName App::Language::ResolveFromLipsyncResource(Red::ResourcePath aPath)
     if (it == s_codes.end())
         return {};
 
-    return it.value();
+    return it->second;
 }

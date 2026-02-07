@@ -211,7 +211,7 @@ void App::LocalizationExtension::MergeTextEntry(TextEntryList& aFinalList, TextE
     }
     else if (!aFallback)
     {
-        auto* originalEntry = aFinalList.Begin() + existingIt.value();
+        auto* originalEntry = aFinalList.Begin() + existingIt->second;
 
         if (!aExtraEntry)
         {

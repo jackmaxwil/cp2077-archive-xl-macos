@@ -1,6 +1,17 @@
 #include "ArchiveService.hpp"
 #include "Core/Facades/Runtime.hpp"
 
+#include <cstdlib>
+
+namespace
+{
+bool IsEnvFlagEnabled(const char* aName)
+{
+    const char* value = std::getenv(aName);
+    return value && *value && !(value[0] == '0' && value[1] == '\0');
+}
+}
+
 App::ArchiveService::ArchiveService(std::filesystem::path aGameDir, std::filesystem::path aBundleDir)
     : m_gameDir(std::move(aGameDir))
     , m_bundleDir(std::move(aBundleDir))
@@ -14,6 +25,12 @@ App::ArchiveService::ArchiveService(std::filesystem::path aGameDir, std::filesys
 
 void App::ArchiveService::OnBootstrap()
 {
+    if (IsEnvFlagEnabled("ARCHIVEXL_DISABLE_ARCHIVE_SERVICE_HOOK"))
+    {
+        LogWarning("[ArchiveService] HookAfter(ResourceDepot::InitializeArchives) disabled via ARCHIVEXL_DISABLE_ARCHIVE_SERVICE_HOOK=1");
+        return;
+    }
+
     HookAfter<Raw::ResourceDepot::InitializeArchives>(&ArchiveService::OnInitializeArchives).OrThrow();
 }
 

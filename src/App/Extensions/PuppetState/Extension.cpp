@@ -110,7 +110,7 @@ void App::PuppetStateExtension::OnDetachPuppet(Red::gameuiCharacterCustomization
     if (it == s_handlers.end())
         return;
 
-    auto& handler = it.value();
+    auto& handler = it->second;
     s_handlers.erase(owner);
 
     auto transactionSystem = Red::GetGameSystem<Red::ITransactionSystem>();
@@ -125,7 +125,7 @@ App::PuppetArmsState App::PuppetStateExtension::GetArmsState(const Red::WeakHand
     if (it == s_handlers.end())
         return PuppetArmsState::BaseArms;
 
-    return it.value()->GetArmsState();
+    return it->second->GetArmsState();
 }
 
 App::PuppetFeetState App::PuppetStateExtension::GetFeetState(const Red::WeakHandle<Red::GameObject>& aPuppet)
@@ -136,7 +136,7 @@ App::PuppetFeetState App::PuppetStateExtension::GetFeetState(const Red::WeakHand
     if (it == s_handlers.end())
         return PuppetFeetState::None;
 
-    return it.value()->GetFeetState();
+    return it->second->GetFeetState();
 }
 
 Red::CName App::PuppetStateExtension::GetBodyType(const Red::WeakHandle<Red::GameObject>& aPuppet)

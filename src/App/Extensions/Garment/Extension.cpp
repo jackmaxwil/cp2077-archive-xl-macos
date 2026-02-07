@@ -324,7 +324,7 @@ void App::GarmentExtension::OnGetVisualTags(Red::AppearanceNameVisualTagsPreset*
         const auto& cachedTagsIt = s_dynamicTagsCache.find(cacheKey);
         if (cachedTagsIt != s_dynamicTagsCache.end())
         {
-            for (const auto& tag : cachedTagsIt.value())
+            for (const auto& tag : cachedTagsIt->second)
             {
                 aFinalTags.Add(tag);
             }

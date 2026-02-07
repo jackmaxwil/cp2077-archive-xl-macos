@@ -52,7 +52,7 @@ void App::ResourceMetaExtension::Configure()
                 if (includePaths != s_scopes.end())
                 {
                     s_scopes[scopePath].erase(targetPath);
-                    s_scopes[scopePath].insert(includePaths.value().begin(), includePaths.value().end());
+                    s_scopes[scopePath].insert(includePaths->second.begin(), includePaths->second.end());
                     updated = true;
                     break;
                 }
@@ -77,7 +77,7 @@ bool App::ResourceMetaExtension::InScope(Red::ResourcePath aScopePath, Red::Reso
     if (it == s_scopes.end())
         return false;
 
-    return it.value().contains(aTargetPath);
+    return it->second.contains(aTargetPath);
 }
 
 const Core::Set<Red::ResourcePath>& App::ResourceMetaExtension::GetList(Red::ResourcePath aScopePath)
@@ -88,7 +88,7 @@ const Core::Set<Red::ResourcePath>& App::ResourceMetaExtension::GetList(Red::Res
     if (it == s_scopes.end())
         return s_null;
 
-    return it.value();
+    return it->second;
 }
 
 Core::Set<std::string> App::ResourceMetaExtension::ExpandList(const Core::Set<std::string>& aList)
@@ -166,5 +166,5 @@ const App::ResourceFix& App::ResourceMetaExtension::GetFix(Red::ResourcePath aTa
     if (it == s_fixes.end())
         return s_null;
 
-    return it.value();
+    return it->second;
 }

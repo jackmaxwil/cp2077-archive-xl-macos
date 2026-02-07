@@ -36,7 +36,7 @@ void App::ComponentState::AddHidingChunkMaskOverride(uint64_t aHash, uint64_t aC
     if (it == m_hidingChunkMasks.end())
         it = m_hidingChunkMasks.emplace(aHash, ~0ull).first;
 
-    it.value() &= aChunkMask;
+    it->second &= aChunkMask;
 
     m_chunkMaskChanged = true;
 }
@@ -48,7 +48,7 @@ void App::ComponentState::AddShowingChunkMaskOverride(uint64_t aHash, uint64_t a
     if (it == m_showingChunkMasks.end())
         it = m_showingChunkMasks.emplace(aHash, 0ull).first;
 
-    it.value() |= aChunkMask;
+    it->second |= aChunkMask;
 
     m_chunkMaskChanged = true;
 }
@@ -111,7 +111,7 @@ void App::ComponentState::AddAppearanceOverride(uint64_t aHash, Red::CName aAppe
     if (it == m_appearanceNames.end())
         it = m_appearanceNames.emplace(aHash, DefaultAppearanceName).first;
 
-    it.value() = aAppearance;
+    it->second = aAppearance;
 
     m_appearanceChanged = true;
 }
@@ -126,7 +126,7 @@ Red::CName App::ComponentState::GetAppearanceOverridde()
     if (m_appearanceNames.empty())
         return DefaultAppearanceName;
 
-    return m_appearanceNames.begin().value();
+    return m_appearanceNames.begin()->second;
 }
 
 bool App::ComponentState::HasAppearanceOverriddes() const
@@ -176,7 +176,7 @@ void App::ResourceState::AddOffsetOverride(uint64_t aHash, int32_t aOffset)
     if (it == m_overridenOffsets.end())
         it = m_overridenOffsets.emplace(aHash, 0).first;
 
-    it.value() = aOffset;
+    it->second = aOffset;
 }
 
 bool App::ResourceState::RemoveOffsetOverride(uint64_t aHash)
@@ -266,7 +266,7 @@ const Core::SharedPtr<App::ComponentState>& App::EntityState::GetComponentState(
     if (it == m_componentStates.end())
         it = m_componentStates.emplace(aComponentName, Core::MakeShared<ComponentState>(aComponentName)).first;
 
-    return it.value();
+    return it->second;
 }
 
 const Core::SharedPtr<App::ComponentState>& App::EntityState::FindComponentState(const Red::CName aComponentName) const
@@ -279,7 +279,7 @@ const Core::SharedPtr<App::ComponentState>& App::EntityState::FindComponentState
     if (it == m_componentStates.end())
         return s_nullComponentState;
 
-    return it.value();
+    return it->second;
 }
 
 const Core::Map<Red::ResourcePath, Core::SharedPtr<App::ResourceState>>& App::EntityState::GetResourceStates() const
@@ -297,7 +297,7 @@ const Core::SharedPtr<App::ResourceState>& App::EntityState::GetResourceState(Re
     if (it == m_resourceStates.end())
         it = m_resourceStates.emplace(aResourcePath, Core::MakeShared<ResourceState>(aResourcePath)).first;
 
-    return it.value();
+    return it->second;
 }
 
 const Core::SharedPtr<App::ResourceState>& App::EntityState::FindResourceState(Red::ResourcePath aResourcePath) const
@@ -310,7 +310,7 @@ const Core::SharedPtr<App::ResourceState>& App::EntityState::FindResourceState(R
     if (it == m_resourceStates.end())
         return s_nullResourceState;
 
-    return it.value();
+    return it->second;
 }
 
 const Core::Set<Red::CName>& App::EntityState::GetPartComponentNames(Red::ResourcePath aResourcePath) const
@@ -323,7 +323,7 @@ const Core::Set<Red::CName>& App::EntityState::GetPartComponentNames(Red::Resour
     if (it == m_partComponents.end())
         return s_nullComponentSet;
 
-    return it.value();
+    return it->second;
 }
 
 void App::EntityState::AddChunkMaskOverride(uint64_t aHash, Red::CName aComponentName, uint64_t aChunkMask, bool aShow)
@@ -762,7 +762,7 @@ Red::ResourcePath App::EntityState::GetOriginalResource(ComponentWrapper& aCompo
     if (it == m_originalResources.end())
         it = m_originalResources.emplace(componentId, aComponent.GetResourcePath()).first;
 
-    return it.value();
+    return it->second;
 }
 
 Red::CName App::EntityState::GetOriginalAppearance(ComponentWrapper& aComponent)
@@ -773,7 +773,7 @@ Red::CName App::EntityState::GetOriginalAppearance(ComponentWrapper& aComponent)
     if (it == m_originalAppearances.end())
         it = m_originalAppearances.emplace(componentId, aComponent.GetAppearanceName()).first;
 
-    return it.value();
+    return it->second;
 }
 
 uint64_t App::EntityState::GetOriginalChunkMask(ComponentWrapper& aComponent)
@@ -784,7 +784,7 @@ uint64_t App::EntityState::GetOriginalChunkMask(ComponentWrapper& aComponent)
     if (it == m_originalChunkMasks.end())
         it = m_originalChunkMasks.emplace(componentId, aComponent.GetChunkMask()).first;
 
-    return it.value();
+    return it->second;
 }
 
 App::OverrideStateManager::OverrideStateManager(Core::SharedPtr<DynamicAppearanceController> aDynamicAppearance)
@@ -797,7 +797,7 @@ Core::SharedPtr<App::EntityState>& App::OverrideStateManager::GetFirstEntityStat
     if (m_entityStates.empty())
         return s_nullEntityState;
 
-    return m_entityStates.begin().value();
+    return m_entityStates.begin()->second;
 }
 
 Core::SharedPtr<App::EntityState>& App::OverrideStateManager::GetEntityState(uint64_t aContext)
@@ -820,11 +820,11 @@ Core::SharedPtr<App::EntityState>& App::OverrideStateManager::GetEntityState(Red
         for (char i = '0'; i < '3'; ++i)
         {
             *(dynamicPath.end() - 5) = i;
-            m_entityStatesByPath.emplace(dynamicPath.c_str(), it.value());
+                m_entityStatesByPath.emplace(dynamicPath.c_str(), it->second);
         }
     }
 
-    return it.value();
+    return it->second;
 }
 
 Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(Red::Entity* aEntity)
@@ -837,7 +837,7 @@ Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(Re
     if (it == m_entityStates.end())
         return s_nullEntityState;
 
-    return it.value();
+    return it->second;
 }
 
 Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(Red::ResourcePath aPath)
@@ -850,7 +850,7 @@ Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(Re
     if (it == m_entityStatesByPath.end())
         return s_nullEntityState;
 
-    return it.value();
+    return it->second;
 }
 
 Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(Red::GarmentProcessingContext* aProcessor)
@@ -863,7 +863,7 @@ Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(Re
     if (it == m_entityStatesByProcessor.end())
         return s_nullEntityState;
 
-    return it.value();
+    return it->second;
 }
 
 Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(uintptr_t aPointer)
@@ -876,7 +876,7 @@ Core::SharedPtr<App::EntityState>& App::OverrideStateManager::FindEntityState(ui
     if (it == m_entityStatesByPointer.end())
         return s_nullEntityState;
 
-    return it.value();
+    return it->second;
 }
 
 void App::OverrideStateManager::ClearStates()
@@ -893,7 +893,7 @@ void App::OverrideStateManager::LinkEntityToAssembler(Red::Entity* aEntity, Red:
 
     if (it != m_entityStates.end())
     {
-        m_entityStatesByProcessor[aProcessor] = it.value();
+        m_entityStatesByProcessor[aProcessor] = it->second;
     }
 }
 
@@ -903,7 +903,7 @@ void App::OverrideStateManager::LinkEntityToPointer(Red::Entity* aEntity, uintpt
 
     if (it != m_entityStates.end())
     {
-        m_entityStatesByPointer[aPointer] = it.value();
+        m_entityStatesByPointer[aPointer] = it->second;
     }
     else
     {

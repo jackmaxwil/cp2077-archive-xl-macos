@@ -14,7 +14,7 @@ struct ResourceFix
     [[nodiscard]] inline Red::CName GetMappedName(Red::CName aName) const
     {
         const auto& it = names.find(aName);
-        return it != names.end() ? it.value() : aName;
+        return it != names.end() ? it->second : aName;
     }
 
     [[nodiscard]] inline bool DefinesPathMappings() const
@@ -25,7 +25,7 @@ struct ResourceFix
     [[nodiscard]] inline Red::ResourcePath GetMappedPath(Red::ResourcePath aPath) const
     {
         const auto& it = paths.find(aPath);
-        return it != paths.end() ? it.value() : aPath;
+        return it != paths.end() ? it->second : aPath;
     }
 
     [[nodiscard]] inline bool DefinesContext() const

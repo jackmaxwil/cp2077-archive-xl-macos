@@ -226,7 +226,7 @@ void App::CustomizationExtension::ApplyAppOverride(Red::AppearanceDescriptor& aA
     auto it = m_customAppOverrides.find(aAppearance);
     if (it != m_customAppOverrides.end())
     {
-        aAppearance = it.value();
+        aAppearance = it->second;
     }
 }
 

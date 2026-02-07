@@ -947,7 +947,7 @@ Core::SharedPtr<App::MeshExtension::MeshState> App::MeshExtension::AcquireMeshSt
         it = s_states.emplace(aMesh->path, Core::MakeShared<MeshState>(aMesh)).first;
     }
 
-    return it.value();
+    return it->second;
 }
 
 Core::SharedPtr<App::MeshExtension::MeshState> App::MeshExtension::FindMeshState(uint64_t aHash)
@@ -960,7 +960,7 @@ Core::SharedPtr<App::MeshExtension::MeshState> App::MeshExtension::FindMeshState
         return {};
     }
 
-    return it.value();
+    return it->second;
 }
 
 void App::MeshExtension::PrefetchMeshState(Red::CMesh* aMesh, const Core::Map<Red::CName, std::string>& aContext)
@@ -1137,7 +1137,7 @@ std::string_view App::MeshExtension::MeshState::GetContextAttr(Red::CName aAttr)
     if (it == contextAttrs.end())
         return {};
 
-    return it.value().value;
+    return it->second.value;
 }
 
 Red::CName App::MeshExtension::MeshState::GetDefaultExpansionName()
@@ -1159,7 +1159,7 @@ int32_t App::MeshExtension::MeshState::GetExpansionIndex(Red::CName aExpansionNa
     if (appearanceEntry == appearances.end())
         return 0;
 
-    return appearanceEntry.value();
+    return appearanceEntry->second;
 }
 
 void App::MeshExtension::MeshState::FillMaterials(Red::CMesh* aMesh)
@@ -1203,7 +1203,7 @@ int32_t App::MeshExtension::MeshState::GetTemplateEntryIndex(Red::CName aMateria
     if (templateEntry == templates.end())
         return -1;
 
-    return templateEntry.value();
+    return templateEntry->second;
 }
 
 int32_t App::MeshExtension::MeshState::GetMaterialEntryIndex(Red::CName aMaterialName)
@@ -1213,7 +1213,7 @@ int32_t App::MeshExtension::MeshState::GetMaterialEntryIndex(Red::CName aMateria
     if (materialEntry == materials.end())
         return -1;
 
-    return materialEntry.value();
+    return materialEntry->second;
 }
 
 bool App::MeshExtension::MeshState::HasMaterialEntry(Red::CName aMaterialName) const
@@ -1236,5 +1236,5 @@ Red::Handle<Red::CMesh> App::MeshExtension::MeshState::ResolveSource(Red::CName 
     if (sourceMesh == sources.end())
         return {};
 
-    return sourceMesh.value().Lock();
+    return sourceMesh->second.Lock();
 }

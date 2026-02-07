@@ -2,6 +2,7 @@
 
 void App::WorldWidgetLimitPatch::OnBootstrap()
 {
+#if defined(_WIN32) || defined(_WIN64)
     auto& code = Core::RawPtr<Red::AddressLib::InkWorldLayer_UpdateComponents, uint8_t[0x100]>::Ref();
     uint8_t op[] = {0x83, 0xFB, 0x0A, 0x73, 0x16};
     bool success = false;
@@ -27,4 +28,8 @@ void App::WorldWidgetLimitPatch::OnBootstrap()
     {
         LogWarning("WorldWidgetComponent limit patch is not applied, expected pattern was not found.");
     }
+#else
+    // Windows/x64-specific patch (byte pattern + VirtualProtect).
+    LogWarning("WorldWidgetComponent limit patch is Windows-only; skipping on macOS.");
+#endif
 }

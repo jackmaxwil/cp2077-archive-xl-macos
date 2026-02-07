@@ -152,7 +152,7 @@ void App::ResourceLinkExtension::Configure()
         }
         else
         {
-            link.value() = targetPath;
+            link->second = targetPath;
         }
 
         ++link;

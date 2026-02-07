@@ -329,7 +329,7 @@ bool App::DynamicAppearanceController::MatchReference(const DynamicAppearanceRef
         if (stateIt == m_states.end())
             return false;
 
-        const auto& state = stateIt.value();
+        const auto& state = stateIt->second;
 
         if (!aReference.Match(state.conditions, aApperance.overrides))
             return false;
@@ -351,7 +351,7 @@ Red::CName App::DynamicAppearanceController::ResolveName(Red::Entity* aEntity, c
     if (stateIt == m_states.end())
         return aName;
 
-    const auto& state = stateIt.value();
+    const auto& state = stateIt->second;
     const auto result = ProcessString(state.values, aVariant, nameStr);
 
     if (!result.valid)
@@ -376,7 +376,7 @@ Red::ResourcePath App::DynamicAppearanceController::ResolvePath(Red::Entity* aEn
     if (stateIt == m_states.end())
         return aPath;
 
-    const auto& state = stateIt.value();
+    const auto& state = stateIt->second;
     auto result = ProcessString(state.values, aVariant, pathStr.data());
 
     if (!result.valid)
@@ -504,14 +504,14 @@ App::DynamicAppearanceController::DynamicString App::DynamicAppearanceController
             const auto localIt = aLocalAttrs.find(attr);
             if (localIt != aLocalAttrs.end())
             {
-                value = localIt.value().ToString();
+                value = localIt->second.ToString();
             }
             else
             {
                 const auto globalIt = aGlobalAttrs.find(attr);
                 if (globalIt != aGlobalAttrs.end())
                 {
-                    value = globalIt.value().value.data();
+                    value = globalIt->second.value.data();
                 }
                 else
                 {

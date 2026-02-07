@@ -3,6 +3,8 @@
 #include "Core/Foundation/Feature.hpp"
 #include "Core/Logging/LoggingDriver.hpp"
 
+#include <mutex>
+
 namespace Support
 {
 class SpdlogProvider
@@ -44,6 +46,8 @@ protected:
     void OnInitialize() override;
 
     std::filesystem::path m_baseLogPath;
+    std::filesystem::path m_resolvedLogPath;
+    std::mutex m_logMutex;
     bool m_appendTimestamp{ false };
     bool m_recentSymlink{ false };
     int32_t m_maxLogCount{ 10 };

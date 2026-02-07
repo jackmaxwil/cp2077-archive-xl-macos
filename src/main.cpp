@@ -3,9 +3,19 @@
 #include "Core/Facades/Hook.hpp"
 #include "Core/Facades/Runtime.hpp"
 
+#include <cstdlib>
+#include <iostream>
+
 namespace
 {
 Core::UniquePtr<App::Application> g_app;
+bool g_initialized = false;
+
+bool IsEnvFlagEnabled(const char* aName)
+{
+    const char* value = std::getenv(aName);
+    return value && *value && !(value[0] == '0' && value[1] == '\0');
+}
 }
 
 // RED4ext
@@ -17,12 +27,26 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle, RED4ext::
     {
     case RED4ext::EMainReason::Load:
     {
+        if (g_initialized)
+            return true;
+        g_initialized = true;
+
+        if (IsEnvFlagEnabled("ARCHIVEXL_DISABLE_BOOTSTRAP"))
+        {
+            std::cerr << "[ArchiveXL] Bootstrap disabled via ARCHIVEXL_DISABLE_BOOTSTRAP=1" << std::endl;
+            return true;
+        }
+
         g_app = Core::MakeUnique<App::Application>(aHandle, aSdk);
         g_app->Bootstrap();
         break;
     }
     case RED4ext::EMainReason::Unload:
     {
+        if (!g_initialized || !g_app)
+            return true;
+        g_initialized = false;
+
         g_app->Shutdown();
         g_app = nullptr;
         break;
@@ -51,6 +75,7 @@ RED4EXT_C_EXPORT uint32_t RED4EXT_CALL Supports()
 
 // ASI
 
+#if defined(_WIN32) || defined(_WIN64)
 BOOL APIENTRY DllMain(HMODULE aHandle, DWORD aReason, LPVOID)
 {
     using GameMain = Core::RawFunc<Red::AddressLib::Main, int32_t (*)(HINSTANCE hInstance, HINSTANCE hPrevInstance,
@@ -88,3 +113,6 @@ BOOL APIENTRY DllMain(HMODULE aHandle, DWORD aReason, LPVOID)
 
     return TRUE;
 }
+#else
+// macOS: No ASI loader support - RED4ext handles plugin lifecycle.
+#endif

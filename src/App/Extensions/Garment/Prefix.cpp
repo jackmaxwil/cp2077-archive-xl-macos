@@ -23,7 +23,7 @@ Red::CName App::ComponentPrefixResolver::GetPrefix(Red::CName aComponentName)
         it = m_resolved.emplace(aComponentName, prefixHash).first;
     }
 
-    return it.value();
+    return it->second;
 }
 
 Core::SharedPtr<App::ComponentPrefixResolver>& App::ComponentPrefixResolver::Get()

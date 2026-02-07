@@ -2,14 +2,29 @@
 #include "App/Project.hpp"
 #include "Red/SharedStorage.hpp"
 
+#include <cstdlib>
+
 namespace
 {
 constexpr auto SharedName = Red::CName("ResourcePathRegistryV3" BUILD_SUFFIX);
+
+bool IsEnvFlagEnabled(const char* aName)
+{
+    const char* value = std::getenv(aName);
+    return value && *value && !(value[0] == '0' && value[1] == '\0');
+}
 }
 
 App::ResourcePathRegistry::ResourcePathRegistry(const std::filesystem::path& aPreloadPath)
 {
+#if defined(__APPLE__)
+    // macOS: CRTTISystem/RTTI shared storage isn't reliably safe during plugin load.
+    // Keep the registry instance local to avoid early RTTI access (prevents startup crashes).
+    static SharedInstance s_localInstance;
+    s_instance = &s_localInstance;
+#else
     s_instance = Red::AcquireSharedInstance<SharedName, SharedInstance>();
+#endif
     s_preloadPath = aPreloadPath;
 }
 
@@ -22,7 +37,14 @@ void App::ResourcePathRegistry::OnBootstrap()
         s_instance->m_initialized = true;
         s_instance->m_map.reserve(400000);
 
-        HookAfter<Raw::ResourcePath::Create>(&OnCreatePath);
+        if (IsEnvFlagEnabled("ARCHIVEXL_DISABLE_RESOURCE_PATH_REGISTRY_HOOK"))
+        {
+            LogWarning("[ResourcePathRegistry] HookAfter(ResourcePath::Create) disabled via ARCHIVEXL_DISABLE_RESOURCE_PATH_REGISTRY_HOOK=1");
+        }
+        else
+        {
+            HookAfter<Raw::ResourcePath::Create>(&OnCreatePath);
+        }
     }
 
     if (!s_instance->m_preloaded && !s_preloadPath.empty() && std::filesystem::exists(s_preloadPath))
@@ -64,7 +86,7 @@ std::string App::ResourcePathRegistry::ResolvePath(Red::ResourcePath aPath)
     if (it == s_instance->m_map.end())
         return {};
 
-    return it.value();
+    return it->second;
 }
 
 std::string App::ResourcePathRegistry::ResolvePathOrHash(Red::ResourcePath aPath)

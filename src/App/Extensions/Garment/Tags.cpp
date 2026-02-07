@@ -164,7 +164,7 @@ App::OverrideTagDefinition& App::OverrideTagManager::GetOverrides(Red::CName aTa
     if (it == m_definitions.end())
         return s_emptyDefinition;
 
-    return it.value();
+    return it->second;
 }
 
 void App::OverrideTagManager::DefineTag(Red::CName aTag, App::OverrideTagDefinition aDefinition)

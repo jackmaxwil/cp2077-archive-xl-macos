@@ -178,13 +178,13 @@ void App::WorldStreamingExtension::OnSectorPostLoad(Red::world::StreamingSector*
     if (sectorMods == s_sectors.end())
         return;
 
-    const auto& sectorPath = sectorMods.value().begin()->path;
+    const auto& sectorPath = sectorMods->second.begin()->path;
     auto patchedAny = false;
     auto successAll = true;
 
     LogInfo("[{}] Patching sector \"{}\"...", ExtensionName, sectorPath);
 
-    for (const auto& sectorMod : sectorMods.value())
+    for (const auto& sectorMod : sectorMods->second)
     {
         LogInfo("[{}] Applying changes from \"{}\"...", ExtensionName, sectorMod.mod);
 

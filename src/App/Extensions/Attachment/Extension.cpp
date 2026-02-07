@@ -196,7 +196,7 @@ void App::AttachmentExtension::OnSlotCheckTPP(bool& aAffected, Red::TweakDBID aS
         const auto& baseSlot = s_baseSlots.find(aSlotID);
         if (baseSlot != s_baseSlots.end())
         {
-            aAffected = (baseSlot.value() == HeadSlot || baseSlot.value() == FaceSlot);
+            aAffected = (baseSlot->second == HeadSlot || baseSlot->second == FaceSlot);
         }
     }
 }
@@ -347,7 +347,7 @@ Core::Set<Red::TweakDBID> App::AttachmentExtension::GetExtraSlots(Red::TweakDBID
     if (extraSlotsIt == s_extraSlots.end())
         return {};
 
-    return extraSlotsIt.value();
+    return extraSlotsIt->second;
 }
 
 Core::Set<Red::TweakDBID> App::AttachmentExtension::GetRelatedSlots(Red::TweakDBID aBaseSlotID)
@@ -360,7 +360,7 @@ Core::Set<Red::TweakDBID> App::AttachmentExtension::GetRelatedSlots(Red::TweakDB
         const auto& extraSlotsIt = s_extraSlots.find(aBaseSlotID);
         if (extraSlotsIt != s_extraSlots.end())
         {
-            const auto& subSlots = extraSlotsIt.value();
+            const auto& subSlots = extraSlotsIt->second;
             result.insert(subSlots.begin(), subSlots.end());
         }
     }
@@ -376,5 +376,5 @@ Core::Set<Red::TweakDBID> App::AttachmentExtension::GetDependentSlots(Red::Tweak
     if (dependentSlotsIt == s_dependentSlots.end())
         return {};
 
-    return dependentSlotsIt.value();
+    return dependentSlotsIt->second;
 }

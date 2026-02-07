@@ -97,7 +97,7 @@ void App::AnimationExtension::OnInitializeAnimations(Red::entAnimatedComponent* 
     LogInfo("[{}] Initializing animations for \"{}:{}\"...",
             ExtensionName, s_resourcePathRegistry->ResolvePathOrHash(templatePath), aComponent->name.ToString());
 
-    for (const auto& anim : anims.value())
+    for (const auto& anim : anims->second)
     {
         LogInfo("[{}] Merging animations from \"{}\" with priority {}...",
                 ExtensionName, s_resourcePathRegistry->ResolvePathOrHash(anim.animSet.path), anim.priority);

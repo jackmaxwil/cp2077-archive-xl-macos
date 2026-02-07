@@ -141,11 +141,15 @@ void App::JournalExtension::OnMappinDataLoaded(void* aMappinSystem, Red::worldRu
     if (cookedMappinResource->cookedData.size && cookedMappinResource->cookedData.size == cookedMappinResource->cookedData.capacity)
     {
         {
-            const auto reserve = std::max(s_mappins.size() << 1, cookedMappinResource->cookedData.size / 2ull);
+            const auto reserve = std::max<std::size_t>(
+                s_mappins.size() << 1,
+                static_cast<std::size_t>(cookedMappinResource->cookedData.size) / 2);
             cookedMappinResource->cookedData.Reserve(cookedMappinResource->cookedData.size + reserve);
         }
         {
-            const auto reserve = std::max(s_mappins.size() << 1, cookedMappinResource->cookedMultiData.size / 2ull);
+            const auto reserve = std::max<std::size_t>(
+                s_mappins.size() << 1,
+                static_cast<std::size_t>(cookedMappinResource->cookedMultiData.size) / 2);
             cookedMappinResource->cookedMultiData.Reserve(cookedMappinResource->cookedMultiData.size + reserve);
         }
     }
@@ -153,7 +157,9 @@ void App::JournalExtension::OnMappinDataLoaded(void* aMappinSystem, Red::worldRu
     auto cookedPoiResource = Raw::MappinSystem::CookedPoiResource::Ptr(aMappinSystem)->instance;
     if (cookedPoiResource->cookedData.size && cookedPoiResource->cookedData.size == cookedPoiResource->cookedData.capacity)
     {
-        const auto reserve = std::max(s_mappins.size() << 1, cookedPoiResource->cookedData.size / 2ull);
+        const auto reserve = std::max<std::size_t>(
+            s_mappins.size() << 1,
+            static_cast<std::size_t>(cookedPoiResource->cookedData.size) / 2);
         cookedPoiResource->cookedData.Reserve(cookedPoiResource->cookedData.size + reserve);
     }
 }
@@ -170,7 +176,7 @@ void* App::JournalExtension::OnGetMappinData(void* aMappinSystem, uint32_t aHash
         const auto it = s_mappins.find(aHash);
         if (it != s_mappins.end())
         {
-            ResolveCookedMappin(aMappinSystem, aHash, it.value(), result);
+            ResolveCookedMappin(aMappinSystem, aHash, it->second, result);
         }
 
         set_r8(r8);
@@ -192,7 +198,7 @@ void* App::JournalExtension::OnGetPoiData(void* aMappinSystem, uint32_t aHash)
         auto it = s_mappins.find(aHash);
         if (it != s_mappins.end())
         {
-            ResolveCookedMappin(aMappinSystem, aHash, it.value(), result);
+            ResolveCookedMappin(aMappinSystem, aHash, it->second, result);
         }
 
         set_r8(r8);

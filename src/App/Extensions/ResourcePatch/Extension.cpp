@@ -1146,7 +1146,7 @@ Core::SharedPtr<App::ResourcePatch> App::ResourcePatchExtension::GetPatchConfig(
     if (patchIt == s_patches.end())
         return {};
 
-    return patchIt.value();
+    return patchIt->second;
 }
 
 const Core::Vector<Red::ResourcePath>& App::ResourcePatchExtension::GetPatchList(Red::ResourcePath aTargetPath)
@@ -1158,7 +1158,7 @@ const Core::Vector<Red::ResourcePath>& App::ResourcePatchExtension::GetPatchList
     if (patchIt == s_patchTargets.end())
         return s_null;
 
-    return patchIt.value();
+    return patchIt->second;
 }
 
 void App::ResourcePatchExtension::LoadPatchResource(Red::ResourcePath aPatchPath)
@@ -1241,11 +1241,11 @@ Red::Handle<Red::AppearanceDefinition> App::ResourcePatchExtension::GetPatchAppe
     if (resourceIt == s_appearanceDefinitions.end())
         return {};
 
-    const auto& definitionIt = resourceIt.value().find(aDefinitionName);
-    if (definitionIt == resourceIt.value().end())
+    const auto& definitionIt = resourceIt->second.find(aDefinitionName);
+    if (definitionIt == resourceIt->second.end())
         return {};
 
-    return definitionIt.value().first;
+    return definitionIt->second.first;
 }
 
 bool App::ResourcePatchExtension::IsPatched(const Red::Handle<Red::meshMeshAppearance>& aAppearance)

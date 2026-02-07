@@ -88,7 +88,7 @@ void App::QuestPhaseExtension::OnPhasePreload(void* aLoader, Red::ResourcePath a
     LogInfo("[{}] Patching phase \"{}\"...", ExtensionName,
             s_resourcePathRegistry->ResolvePathOrHash(aPhaseResource->path));
 
-    for (const auto& phaseMod : phaseMods.value())
+    for (const auto& phaseMod : phaseMods->second)
     {
         PatchPhase(aPhaseResource, phaseMod);
     }
