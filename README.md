@@ -1,44 +1,55 @@
-# ArchiveXL (macOS Port)
+# ArchiveXL (macOS)
 
-> **⚠️ macOS-only fork/port.** For Windows, use the original: [psiberx/cp2077-archive-xl](https://github.com/psiberx/cp2077-archive-xl)
+Custom archive and resource loading for Cyberpunk 2077 on macOS ARM64.
 
-ArchiveXL is a modding tool that allows you to load custom resources without touching original game files,
-thus allowing multiple mods to expand same resources without conflicts.
+**Status:** Build validated — 130/130 addresses resolved, 6 hooks registered, all services enabled.
 
-With the mod you can:
+## What it does
 
-- Load custom entity factories (necessary for item additions)
-- Add localization texts that can be used in scripts, resources and TweakDB
-- Edit existing localization texts without overwriting original resources
-- Override submeshes visibility of entity parts
-- Add visual tags to a clothing item
-- Spawn widgets from any library without registering dependencies
+ArchiveXL enables loading custom resources (archives, factories, localization, garments, animations, world streaming) without overwriting base game files. Built as a RED4ext `.dylib` plugin with 130 custom address mappings.
 
-## Getting Started
+## Prerequisites
 
-### Compatibility
+- RED4ext installed and functional
+- CMake 3.24+, Clang 15+
 
-- Cyberpunk 2077 **macOS v2.3.1**
-- Apple Silicon (arm64)
-- [RED4ext macOS port](https://github.com/memaxo/RED4ext) installed and working
-- [redscript](https://github.com/jac3km4/redscript) 0.5.31+
+## Build
 
-### Installation
+```bash
+mkdir build-macos && cd build-macos
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.ncpu)
+```
 
-1. Install requirements:
-   - [RED4ext](https://docs.red4ext.com/getting-started/installing-red4ext) 1.29.0+
-2. Extract the release archive `ArchiveXL-x.x.x.zip` into the Cyberpunk 2077 directory.
+## Install
 
-## Documentation
+```bash
+cp build-macos/ArchiveXL.dylib "<game>/red4ext/plugins/ArchiveXL/"
+```
 
-- **macOS port docs**
-  - `docs/STATUS.md` (current status)
-  - `docs/MACOS_ADDRESS_DISCOVERY.md` (address discovery pipeline + current gaps)
-  - `docs/MACOS_PORTING_AUDIT.md` (original porting feasibility/audit)
+## Runtime validation
 
-- [Dynamic appearances](https://github.com/psiberx/cp2077-archive-xl/wiki#dynamic-appearances)
-- [Body types](https://github.com/psiberx/cp2077-archive-xl/wiki#body-types)
-- [Appearance suffixes](https://github.com/psiberx/cp2077-archive-xl/wiki#appearance-suffixes)
-- [Components overrides](https://github.com/psiberx/cp2077-archive-xl/wiki#components-overrides)
-- [Visual tags](https://github.com/psiberx/cp2077-archive-xl/wiki#visual-tags)
-- [Extending resources](https://github.com/psiberx/cp2077-archive-xl/wiki#extending-resources)
+```bash
+ARCHIVEXL_ADDR_TRACE=1 ARCHIVEXL_HOOK_TRACE=1 ./launch_red4ext.sh
+```
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `lib/Support/macOS/ArchiveXLAddressResolver.cpp` | 130 address mappings |
+| `src/Red/Addresses/Library.hpp` | Hash constant definitions |
+| `tools/macos_discover_archivexl_offsets.py` | Address discovery tool |
+| `docs/STATUS.md` | Port status |
+
+## Related projects
+
+| Project | Description |
+|---------|-------------|
+| [RED4ext](../RED4ext) | Required mod loader |
+| [RED4ext.SDK](../RED4ext.SDK) | SDK dependency |
+| [TweakXL](../cp2077-tweak-xl) | Companion tweak plugin |
+
+## Attribution
+
+Forked from [psiberx/cp2077-archive-xl](https://github.com/psiberx/cp2077-archive-xl). macOS port by memaxo.
