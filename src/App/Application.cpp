@@ -51,18 +51,8 @@ App::Application::Application(void* aHandle, const RED4ext::Sdk* aSdk)
 
     Register<App::ResourcePathRegistry>();
     Register<App::ArchiveService>(Env::GameDir(), Env::BundleDir());
-#if defined(_WIN32) || defined(_WIN64)
     Register<App::ExtensionService>(Env::BundleDir());
-#else
-    // macOS: Temporarily disabled while validating hook offsets.
-    // This service installs multiple hooks (InitResourceDepot/LoadGatheredResources/LoadTweakDB).
-#endif
-#if defined(_WIN32) || defined(_WIN64)
     Register<App::EntitySpawnerPatch>();
-#else
-    // macOS: Disabled for now.
-    // This patch writes into game request structs and requires macOS layout verification first.
-#endif
     Register<App::WorldWidgetLimitPatch>();
 }
 

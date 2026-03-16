@@ -4,6 +4,7 @@
 #include "Core/Hooking/HookingDriver.hpp"
 #include <RED4ext/Api/Sdk.hpp>
 #include <iostream>
+#include <cstdlib>
 
 namespace Support
 {
@@ -19,16 +20,31 @@ public:
     }
 
 protected:
+    static bool IsHookTraceEnabled()
+    {
+        static const bool enabled = []() {
+            const char* value = std::getenv("ARCHIVEXL_HOOK_TRACE");
+            return value && value[0] != '\0' && value[0] != '0';
+        }();
+        return enabled;
+    }
+
     void OnInitialize() override
     {
-        std::cerr << "[MacOSHookingProvider] Setting as default hooking driver" << std::endl;
+        if (IsHookTraceEnabled())
+        {
+            std::cerr << "[MacOSHookingProvider] Setting as default hooking driver" << std::endl;
+        }
         SetDefault(*this);
     }
 
     bool HookAttach(uintptr_t aAddress, void* aCallback) override
     {
-        std::cerr << "[MacOSHookingProvider] HookAttach (no original): " << std::hex << aAddress << " -> " << aCallback
-                  << std::dec << std::endl;
+        if (IsHookTraceEnabled())
+        {
+            std::cerr << "[MacOSHookingProvider] HookAttach (no original): " << std::hex << aAddress << " -> "
+                      << aCallback << std::dec << std::endl;
+        }
 
         if (!m_sdk || !m_sdk->hooking)
         {
@@ -41,8 +57,11 @@ protected:
 
     bool HookAttach(uintptr_t aAddress, void* aCallback, void** aOriginal) override
     {
-        std::cerr << "[MacOSHookingProvider] HookAttach (with original): " << std::hex << aAddress << " -> " << aCallback
-                  << std::dec << std::endl;
+        if (IsHookTraceEnabled())
+        {
+            std::cerr << "[MacOSHookingProvider] HookAttach (with original): " << std::hex << aAddress << " -> "
+                      << aCallback << std::dec << std::endl;
+        }
 
         if (!m_sdk || !m_sdk->hooking)
         {
@@ -55,7 +74,10 @@ protected:
 
     bool HookDetach(uintptr_t aAddress) override
     {
-        std::cerr << "[MacOSHookingProvider] HookDetach: " << std::hex << aAddress << std::dec << std::endl;
+        if (IsHookTraceEnabled())
+        {
+            std::cerr << "[MacOSHookingProvider] HookDetach: " << std::hex << aAddress << std::dec << std::endl;
+        }
 
         if (!m_sdk || !m_sdk->hooking)
         {

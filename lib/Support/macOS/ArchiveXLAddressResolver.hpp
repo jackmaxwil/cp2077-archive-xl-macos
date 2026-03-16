@@ -22,7 +22,7 @@ public:
     uintptr_t ResolveAddress(uint32_t aAddressID) override;
 
     /**
-     * Get the image base address (cached).
+     * Get the main executable image base (cached).
      */
     static uintptr_t GetImageBase();
 

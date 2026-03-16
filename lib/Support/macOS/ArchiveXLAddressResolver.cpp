@@ -1,11 +1,24 @@
 #include "ArchiveXLAddressResolver.hpp"
-#include <mach-o/dyld.h>
 #include <iostream>
+#include <cstdlib>
+#include <RED4ext/Relocation.hpp>
 
 namespace Support
 {
 
 std::unordered_map<uint32_t, int> ArchiveXLAddressResolver::s_requestedAddresses;
+
+namespace
+{
+bool IsAddressTraceEnabled()
+{
+    static const bool enabled = []() {
+        const char* value = std::getenv("ARCHIVEXL_ADDR_TRACE");
+        return value && value[0] != '\0' && value[0] != '0';
+    }();
+    return enabled;
+}
+}
 
 ArchiveXLAddressResolver::ArchiveXLAddressResolver()
 {
@@ -15,12 +28,15 @@ ArchiveXLAddressResolver::ArchiveXLAddressResolver()
 void ArchiveXLAddressResolver::OnInitialize()
 {
     AddressResolver::SetDefault(*this);
-    std::cerr << "[ArchiveXLAddressResolver] Registered as default address resolver" << std::endl;
+    if (IsAddressTraceEnabled())
+    {
+        std::cerr << "[ArchiveXLAddressResolver] Registered as default address resolver" << std::endl;
+    }
 }
 
 uintptr_t ArchiveXLAddressResolver::GetImageBase()
 {
-    static const uintptr_t base = reinterpret_cast<uintptr_t>(_dyld_get_image_header(0));
+    static const uintptr_t base = RED4ext::RelocBase::GetImageBase();
     return base;
 }
 
@@ -429,8 +445,11 @@ void ArchiveXLAddressResolver::InitializeAddressTable()
     // TweakDB_Load (0xD6BB165A)
     m_addressTable[3602585178] = 0x2B76A50;
 
-    std::cerr << "[ArchiveXLAddressResolver] Initialized with " << m_addressTable.size()
-              << " address mappings" << std::endl;
+    if (IsAddressTraceEnabled())
+    {
+        std::cerr << "[ArchiveXLAddressResolver] Initialized with " << m_addressTable.size() << " address mappings"
+                  << std::endl;
+    }
 }
 
 uintptr_t ArchiveXLAddressResolver::ResolveAddress(uint32_t aAddressID)
@@ -449,8 +468,11 @@ uintptr_t ArchiveXLAddressResolver::ResolveAddress(uint32_t aAddressID)
         }
 
         const uintptr_t resolved = GetImageBase() + offset;
-        std::cerr << "[ArchiveXLAddressResolver] Resolved 0x" << std::hex << aAddressID << " -> 0x" << resolved
-                  << std::dec << std::endl;
+        if (IsAddressTraceEnabled())
+        {
+            std::cerr << "[ArchiveXLAddressResolver] Resolved 0x" << std::hex << aAddressID << " -> 0x" << resolved
+                      << std::dec << std::endl;
+        }
         return resolved;
     }
 
