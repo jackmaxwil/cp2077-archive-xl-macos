@@ -11,9 +11,9 @@ class Application
 {
 public:
 #if defined(_WIN32) || defined(_WIN64)
-    explicit Application(HMODULE aHandle, const RED4ext::Sdk* aSdk = nullptr);
+    explicit Application(HMODULE aHandle, const RED4ext::v1::Sdk* aSdk = nullptr);
 #else
-    explicit Application(void* aHandle, const RED4ext::Sdk* aSdk = nullptr);
+    explicit Application(void* aHandle, const RED4ext::v1::Sdk* aSdk = nullptr);
 #endif
 
 protected:

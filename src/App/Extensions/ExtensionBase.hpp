@@ -39,6 +39,7 @@ public:
     virtual bool AddConfig(const std::string& aConfigName, const YAML::Node& aConfigNode) = 0;
     virtual void ResetConfigs() {}
     virtual void Configure() {}
+    virtual void PostConfigure() {}
     virtual void Reload() {}
 };
 
@@ -46,6 +47,12 @@ struct ExtensionConfig
 {
     virtual bool IsDefined() = 0;
     virtual void LoadYAML(const YAML::Node& aNode) = 0;
+
+    template<typename... Args>
+    constexpr void AddIssue(std::format_string<Args...> aFormat, Args&&... aArgs)
+    {
+        issues.push_back(std::format(aFormat, std::forward<Args>(aArgs)...));
+    }
 
     [[nodiscard]] bool HasIssues() const
     {

@@ -54,7 +54,7 @@ bool App::ResourcePatchExtension::Load()
     HookBefore<Raw::ResourceSerializer::Deserialize>(&OnResourceDeserialize).OrThrow();
     HookBefore<Raw::ResourceSerializer::OnDependenciesReady>(&OnResourceReady).OrThrow();
     HookBefore<Raw::EntityTemplate::PostLoad>(&OnEntityTemplateLoad).OrThrow();
-    HookBefore<Raw::AppearanceResource::OnLoad>(&OnAppearanceResourceLoad).OrThrow();
+    HookBefore<Raw::AppearanceResource::PostLoad>(&OnAppearanceResourceLoad).OrThrow();
     HookBefore<Raw::CMesh::PostLoad>(&OnMeshResourceLoad).OrThrow();
     Hook<Raw::MorphTargetMesh::PostLoad>(&OnMorphTargetResourceLoad).OrThrow();
     HookBefore<Raw::EntityBuilder::ScheduleExtractComponentsJob>(&OnEntityPackageLoad).OrThrow();
@@ -76,7 +76,7 @@ bool App::ResourcePatchExtension::Unload()
     Unhook<Raw::ResourceSerializer::Deserialize>();
     Unhook<Raw::ResourceSerializer::OnDependenciesReady>();
     Unhook<Raw::EntityTemplate::PostLoad>();
-    Unhook<Raw::AppearanceResource::OnLoad>();
+    Unhook<Raw::AppearanceResource::PostLoad>();
     Unhook<Raw::CMesh::PostLoad>();
     Unhook<Raw::MorphTargetMesh::PostLoad>();
     Unhook<Raw::EntityBuilder::ScheduleExtractComponentsJob>();
@@ -89,19 +89,23 @@ bool App::ResourcePatchExtension::Unload()
 
 void App::ResourcePatchExtension::Configure()
 {
-    s_patchTargets.clear();
+    s_patches.clear();
+    s_targetPatches.clear();
+    s_dynamicPatches.clear();
 
     auto depot = Red::ResourceDepot::Get();
 
     Core::Map<Red::ResourcePath, std::string> knownPaths;
     Core::Set<Red::ResourcePath> invalidPaths;
-    Core::Set<Red::ResourcePath> patchPaths;
-    Core::Map<Red::ResourcePath, Core::Set<Red::ResourcePath>> knownPatches;
 
     for (auto& config : m_configs)
     {
-        for (const auto& [patchPath, patchConfig] : config.patches)
+        knownPaths.insert(config.paths.begin(), config.paths.end());
+
+        for (auto& patchConfig : config.patches)
         {
+            const auto patchPath = patchConfig.source;
+
             if (!depot->ResourceExists(patchPath))
             {
                 if (!invalidPaths.contains(patchPath))
@@ -113,58 +117,32 @@ void App::ResourcePatchExtension::Configure()
             }
 
             Core::Set<Red::ResourcePath> targetList;
-
-            for (const auto& includePath : patchConfig.includes)
             {
-                const auto& includeList = ResourceMetaExtension::GetList(includePath);
-                if (!includeList.empty())
-                {
-                    targetList.insert(includeList.begin(), includeList.end());
-                }
-                else
-                {
-                    targetList.insert(includePath);
-                }
+                const auto includeList = ResourceMetaExtension::ExpandList(patchConfig.includes);
+                targetList.insert(includeList.begin(), includeList.end());
             }
-
-            for (const auto& excludePath : patchConfig.excludes)
             {
-                const auto& excludeList = ResourceMetaExtension::GetList(excludePath);
-                if (!excludeList.empty())
-                {
-                    targetList.erase(excludeList.begin(), excludeList.end());
-                }
-                else
-                {
-                    targetList.erase(excludePath);
-                }
+                const auto excludeList = ResourceMetaExtension::ExpandList(patchConfig.excludes);
+                targetList.erase(excludeList.begin(), excludeList.end());
             }
-
             targetList.erase(patchPath);
 
-            for (const auto& targetPath : targetList)
+            const auto patchInstance = Core::MakeShared<PatchInstance>(patchConfig.source, std::move(targetList),
+                                                                       std::move(patchConfig.props), patchConfig.order);
+            s_patches[patchPath].push_back(patchInstance);
+
+            for (const auto targetPath : patchInstance->targets)
             {
-                if (!knownPatches[targetPath].contains(patchPath))
-                {
-                    s_patchTargets[targetPath].push_back(patchPath);
-                    knownPatches[targetPath].insert(patchPath);
-                }
-
-                knownPaths.insert_or_assign(targetPath, config.paths[targetPath]);
+                s_targetPatches[targetPath].push_back(patchInstance);
             }
-
-            knownPaths.insert_or_assign(patchPath, config.paths[patchPath]);
-            patchPaths.insert(patchPath);
-
-            s_patches[patchPath] = Core::MakeShared<ResourcePatch>(patchConfig);
         }
     }
 
-    for (auto patch = s_patchTargets.begin(); patch != s_patchTargets.end();)
+    for (auto patchIt = s_targetPatches.begin(); patchIt != s_targetPatches.end();)
     {
-        const auto& targetPath = patch->first;
+        const auto& targetPath = patchIt->first;
 
-        if (patchPaths.contains(targetPath))
+        if (s_patches.contains(targetPath))
         {
             if (!invalidPaths.contains(targetPath))
             {
@@ -173,11 +151,18 @@ void App::ResourcePatchExtension::Configure()
                 invalidPaths.insert(targetPath);
             }
 
-            patch = s_patchTargets.erase(patch);
+            patchIt = s_targetPatches.erase(patchIt);
             continue;
         }
 
-        ++patch;
+        ++patchIt;
+    }
+
+    for (auto patchIt = s_targetPatches.begin(); patchIt != s_targetPatches.end(); ++patchIt)
+    {
+        auto& patchList = patchIt->second;
+        std::sort(patchList.begin(), patchList.end(),
+                  [](const PatchInstancePtr& a, const PatchInstancePtr& b) { return a->order < b->order; });
     }
 
     for (const auto& [knownPath, knownPathStr] : knownPaths)
@@ -196,9 +181,9 @@ void App::ResourcePatchExtension::OnResourceRequest(void* aSerializer, uint64_t 
     if (patchList.empty())
         return;
 
-    for (const auto& patchPath : patchList)
+    for (auto& patchInstance : patchList)
     {
-        LoadPatchResource(patchPath);
+        patchInstance->LoadResource();
     }
 }
 
@@ -212,9 +197,9 @@ void App::ResourcePatchExtension::OnResourceDeserialize(void* aSerializer, uint6
     if (patchList.empty())
         return;
 
-    for (const auto& patchPath : patchList)
+    for (auto& patchInstance : patchList)
     {
-        auto patchToken = GetPatchToken(patchPath);
+        auto patchToken = patchInstance->GetToken();
         if (patchToken)
         {
             aJob.Join(patchToken->job);
@@ -224,20 +209,44 @@ void App::ResourcePatchExtension::OnResourceDeserialize(void* aSerializer, uint6
 
 void App::ResourcePatchExtension::OnResourceReady(Red::ResourceSerializerContext* aContext)
 {
-    if (aContext->serializables.size > 0)
+    if (!aContext->serializables.IsEmpty())
     {
         for (const auto& serializable : aContext->serializables)
         {
-            if (const auto& resource = Red::Cast<Red::CurveSet>(serializable))
+            switch (serializable->GetNativeType()->GetName())
             {
-                OnCurveSetResourceLoad(resource);
-                continue;
+            case Red::GetTypeName<Red::CurveSet>():
+            {
+                if (const auto& resource = Red::Cast<Red::CurveSet>(serializable))
+                {
+                    OnCurveSetResourceLoad(resource);
+                }
+                break;
             }
-
-            if (const auto& resource = Red::Cast<Red::gameDeviceResource>(serializable))
+            case Red::GetTypeName<Red::gameDeviceResource>():
             {
-                OnDeviceResourceLoad(resource);
-                continue;
+                if (const auto& resource = Red::Cast<Red::gameDeviceResource>(serializable))
+                {
+                    OnDeviceResourceLoad(resource);
+                }
+                break;
+            }
+            case Red::GetTypeName<Red::worldStreamingWorld>():
+            {
+                if (const auto& resource = Red::Cast<Red::worldStreamingWorld>(serializable))
+                {
+                    OnStreamingWorldLoad(resource);
+                }
+                break;
+            }
+            case Red::GetTypeName<Red::inkanimAnimationLibraryResource>():
+            {
+                if (const auto& resource = Red::Cast<Red::inkanimAnimationLibraryResource>(serializable))
+                {
+                    OnInkAnimResourceLoad(resource);
+                }
+                break;
+            }
             }
         }
     }
@@ -252,16 +261,17 @@ void App::ResourcePatchExtension::OnEntityTemplateLoad(Red::EntityTemplate* aTem
 
     auto depot = Red::ResourceDepot::Get();
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::EntityTemplate>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::EntityTemplate>();
 
         if (!patchResource)
             continue;
 
-        const auto& patchConfig = GetPatchConfig(patchPath);
+        const auto targetPathStr = s_resourcePathRegistry->ResolvePathOrHash(aTemplate->path);
+        const auto patchPathStr = s_resourcePathRegistry->ResolvePathOrHash(patchResource->path);
 
-        if (patchConfig->Modifies(EntityTemplateAppearancesProp))
+        if (patchInstance->Modifies(EntityTemplateAppearancesProp))
         {
             for (const auto& patchAppearance : patchResource->appearances)
             {
@@ -280,19 +290,29 @@ void App::ResourcePatchExtension::OnEntityTemplateLoad(Red::EntityTemplate* aTem
                 if (isNewAppearance)
                 {
                     aTemplate->appearances.EmplaceBack(patchAppearance);
+
+                    LogInfo(R"([{}] Appearance "{}" from "{}" added to "{}".)",
+                            ExtensionName, patchAppearance.name.ToString(), patchPathStr, targetPathStr);
+                }
+                else
+                {
+                    LogInfo(R"([{}] Appearance "{}" from "{}" replaced appearance "{}" of "{}".)",
+                            ExtensionName, patchAppearance.name.ToString(), patchPathStr,
+                            patchAppearance.name.ToString(), targetPathStr);
                 }
             }
         }
 
-        if (patchConfig->Modifies(EntityTemplateDependenciesProp))
+        if (patchInstance->Modifies(EntityTemplateDependenciesProp))
         {
             for (const auto& dependency : patchResource->resolvedDependencies)
             {
+                const auto dependencyPathStr = s_resourcePathRegistry->ResolvePathOrHash(dependency.path);
+
                 if (!depot->ResourceExists(dependency.path))
                 {
                     LogError(R"([{}] Patch resource "{}" refers to non-existent resource "{}".)",
-                             ExtensionName, s_resourcePathRegistry->ResolvePathOrHash(patchResource->path),
-                             s_resourcePathRegistry->ResolvePathOrHash(dependency.path));
+                             ExtensionName, patchPathStr, dependencyPathStr);
                     continue;
                 }
 
@@ -305,11 +325,15 @@ void App::ResourcePatchExtension::OnEntityTemplateLoad(Red::EntityTemplate* aTem
                 if (isNewDependency)
                 {
                     aTemplate->resolvedDependencies.PushBack(dependency);
+
+                    LogInfo(R"([{}] Dependency "{}" from "{}" added to "{}".)",
+                            ExtensionName, dependencyPathStr, patchPathStr, targetPathStr);
                 }
             }
         }
 
-        if (patchResource->visualTagsSchema && (patchConfig->Modifies(EntityTemplateVisualTagsProp)))
+        if (patchInstance->Modifies(EntityTemplateVisualTagsProp) && patchResource->visualTagsSchema &&
+            !patchResource->visualTagsSchema->visualTags.IsEmpty())
         {
             if (!aTemplate->visualTagsSchema)
             {
@@ -317,11 +341,13 @@ void App::ResourcePatchExtension::OnEntityTemplateLoad(Red::EntityTemplate* aTem
             }
 
             aTemplate->visualTagsSchema->visualTags.Add(patchResource->visualTagsSchema->visualTags);
+
+            LogInfo(R"([{}] Visual tags from "{}" merged into "{}".)", ExtensionName, patchPathStr, targetPathStr);
         }
     }
 }
 
-void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResource* aResource)
+void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResource* aResource, Red::PostLoadParams*)
 {
     const auto& patchList = GetPatchList(aResource->path);
 
@@ -332,20 +358,27 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
 
     Core::Set<Red::CName> newAppearances;
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::AppearanceResource>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::AppearanceResource>();
 
         if (!patchResource)
             continue;
 
-        const auto& patchConfig = GetPatchConfig(patchPath);
+        const auto targetPathStr = s_resourcePathRegistry->ResolvePathOrHash(aResource->path);
+        const auto patchPathStr = s_resourcePathRegistry->ResolvePathOrHash(patchResource->path);
 
-        if (patchConfig->Modifies(AppearanceResourceDefinitionsProp))
+        if (patchInstance->Modifies(AppearanceResourceDefinitionsProp))
         {
             for (const auto& patchDefinition : patchResource->appearances)
             {
                 const auto isMultiTargetPatch = patchDefinition->name.IsNone();
+
+                if (patchInstance->Modifies(AppearanceResourceComponentsProp))
+                {
+                    patchInstance->PrefetchAppearance(patchDefinition);
+                }
+
                 auto isNewAppearance = !isMultiTargetPatch;
 
                 for (auto& existingDefinition : aResource->appearances)
@@ -365,26 +398,16 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                         }
                     }
 
-                    if (patchConfig->Modifies(AppearanceResourceComponentsProp))
-                    {
-                        std::unique_lock _(s_appearanceDefinitionLock);
-                        if (!s_appearanceDefinitions[patchPath].contains(existingDefinition->name))
-                        {
-                            auto patchBufferToken = patchDefinition->compiledData.LoadAsync();
-                            s_appearanceDefinitions[patchPath][existingDefinition->name] = {patchDefinition,
-                                                                                            patchBufferToken};
-                        }
-                    }
-
-                    if (patchConfig->Modifies(AppearanceResourcePartsValuesProp))
+                    if (patchInstance->Modifies(AppearanceResourcePartsValuesProp))
                     {
                         for (const auto& partValue : patchDefinition->partsValues)
                         {
+                            const auto partPathStr = s_resourcePathRegistry->ResolvePathOrHash(partValue.resource.path);
+
                             if (!depot->ResourceExists(partValue.resource.path))
                             {
                                 LogError(R"([{}] Patch resource "{}" refers to non-existent resource "{}".)",
-                                         ExtensionName, s_resourcePathRegistry->ResolvePathOrHash(patchResource->path),
-                                         s_resourcePathRegistry->ResolvePathOrHash(partValue.resource.path));
+                                         ExtensionName, patchPathStr, partPathStr);
                                 continue;
                             }
 
@@ -398,27 +421,37 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                             if (isNewPart)
                             {
                                 existingDefinition->partsValues.PushBack(partValue);
+
+                                LogInfo(R"([{}] Part resource "{}" from "{}" of "{}" added to "{}" of "{}".)",
+                                        ExtensionName, partPathStr, patchDefinition->name.ToString(), patchPathStr,
+                                        existingDefinition->name.ToString(), targetPathStr);
                             }
                         }
                     }
 
-                    if (patchConfig->Modifies(AppearanceResourcePartsOverridesProp))
+                    if (patchInstance->Modifies(AppearanceResourcePartsOverridesProp) &&
+                        !patchDefinition->partsOverrides.IsEmpty())
                     {
                         for (const auto& partOverride : patchDefinition->partsOverrides)
                         {
                             existingDefinition->partsOverrides.PushBack(partOverride);
                         }
+
+                        LogInfo(R"([{}] Parts overrides from "{}" of "{}" added to "{}" of "{}".)",
+                            ExtensionName, patchDefinition->name.ToString(), patchPathStr,
+                            existingDefinition->name.ToString(), targetPathStr);
                     }
 
-                    if (patchConfig->Modifies(AppearanceResourceDependenciesProp))
+                    if (patchInstance->Modifies(AppearanceResourceDependenciesProp))
                     {
                         for (const auto& dependency : patchDefinition->resolvedDependencies)
                         {
+                            const auto dependencyPathStr = s_resourcePathRegistry->ResolvePathOrHash(dependency.path);
+
                             if (!depot->ResourceExists(dependency.path))
                             {
                                 LogError(R"([{}] Patch resource "{}" refers to non-existent resource "{}".)",
-                                         ExtensionName, s_resourcePathRegistry->ResolvePathOrHash(patchResource->path),
-                                         s_resourcePathRegistry->ResolvePathOrHash(dependency.path));
+                                         ExtensionName, patchPathStr, dependencyPathStr);
                                 continue;
                             }
 
@@ -432,13 +465,22 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                             if (isNewDependency)
                             {
                                 existingDefinition->resolvedDependencies.PushBack(dependency);
+
+                                LogInfo(R"([{}] Dependency "{}" from "{}" of "{}" added to "{}" of "{}".)",
+                                    ExtensionName, dependencyPathStr, patchDefinition->name.ToString(), patchPathStr,
+                                    existingDefinition->name.ToString(), targetPathStr);
                             }
                         }
                     }
 
-                    if (patchConfig->Modifies(AppearanceResourceVisualTagsProp))
+                    if (patchInstance->Modifies(AppearanceResourceVisualTagsProp) &&
+                        !patchDefinition->visualTags.IsEmpty())
                     {
                         existingDefinition->visualTags.Add(patchDefinition->visualTags);
+
+                        LogInfo(R"([{}] Visual tags of "{}" from "{}" merged into "{}" from "{}".)",
+                                ExtensionName, patchDefinition->name.ToString(), patchPathStr,
+                                existingDefinition->name.ToString(), targetPathStr);
                     }
 
                     if (!isMultiTargetPatch)
@@ -451,15 +493,21 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                 {
                     aResource->appearances.EmplaceBack(patchDefinition);
                     newAppearances.insert(patchDefinition->name);
+
+                    LogInfo(R"([{}] Appearance "{}" from "{}" added to "{}".)",
+                            ExtensionName, patchDefinition->name.ToString(), patchPathStr, targetPathStr);
                 }
             }
         }
 
-        if (patchConfig->Modifies(AppearanceResourceCensorshipProp))
+        if (patchInstance->Modifies(AppearanceResourceCensorshipProp))
         {
             for (const auto& censorship : patchResource->censorshipMapping)
             {
                 aResource->censorshipMapping.PushBack(censorship);
+
+                LogInfo(R"([{}] Censorship "{}" from "{}" added to "{}".)",
+                        ExtensionName, censorship.Original.ToString(), patchPathStr, targetPathStr);
             }
         }
     }
@@ -488,18 +536,19 @@ void App::ResourcePatchExtension::OnMeshResourceLoad(Red::CMesh* aMesh, Red::Pos
 
     if (!patchList.empty())
     {
-        for (const auto& patchPath : patchList)
+        for (const auto& patchInstance : patchList)
         {
-            auto patchMesh = GetPatchResource<Red::CMesh>(patchPath);
+            auto patchMesh = patchInstance->GetResource<Red::CMesh>();
 
             if (!patchMesh)
                 continue;
 
-            const auto& patchConfig = GetPatchConfig(patchPath);
+            const auto targetPathStr = s_resourcePathRegistry->ResolvePathOrHash(aMesh->path);
+            const auto patchPathStr = s_resourcePathRegistry->ResolvePathOrHash(patchMesh->path);
 
-            if (patchMesh->appearances.size != 0 && (patchConfig->Modifies(MeshAppearancesProp)))
+            if (patchInstance->Modifies(MeshAppearancesProp) && !patchMesh->appearances.IsEmpty())
             {
-                auto sourceTag = MeshExtension::RegisterMeshSource(aMesh, patchMesh);
+                auto sourceTag = MeshExtension::RegisterMeshPatch(aMesh, patchMesh);
                 auto expansionTag = Red::CName();
 
                 for (const auto& patchAppearance : patchMesh->appearances)
@@ -508,7 +557,7 @@ void App::ResourcePatchExtension::OnMeshResourceLoad(Red::CMesh* aMesh, Red::Pos
                     cloneAppearance->name = patchAppearance->name;
                     cloneAppearance->chunkMaterials = patchAppearance->chunkMaterials;
 
-                    if (patchAppearance->tags.size == 1)
+                    if (patchAppearance->tags.Size() == 1)
                     {
                         expansionTag = patchAppearance->tags[0];
                     }
@@ -523,8 +572,8 @@ void App::ResourcePatchExtension::OnMeshResourceLoad(Red::CMesh* aMesh, Red::Pos
                     {
                         if (existingAppearance->name == cloneAppearance->name)
                         {
-                            if (existingAppearance->chunkMaterials.size == 0 ||
-                                cloneAppearance->chunkMaterials.size != 0)
+                            if (existingAppearance->chunkMaterials.IsEmpty() ||
+                                !cloneAppearance->chunkMaterials.IsEmpty())
                             {
                                 existingAppearance = cloneAppearance;
                             }
@@ -537,13 +586,22 @@ void App::ResourcePatchExtension::OnMeshResourceLoad(Red::CMesh* aMesh, Red::Pos
                     if (isNewAppearance)
                     {
                         aMesh->appearances.EmplaceBack(cloneAppearance);
+
+                        LogInfo(R"([{}] Appearance "{}" from "{}" added to "{}".)",
+                                ExtensionName, patchAppearance->name.ToString(), patchPathStr, targetPathStr);
+                    }
+                    else
+                    {
+                        LogInfo(R"([{}] Appearance "{}" from "{}" replaced appearance "{}" of "{}".)",
+                                ExtensionName, patchAppearance->name.ToString(), patchPathStr,
+                                patchAppearance->name.ToString(), targetPathStr);
                     }
                 }
 
                 aMesh->forceLoadAllAppearances = false;
             }
 
-            if (patchMesh->renderResourceBlob && patchConfig->Modifies(MeshBlobProp, aMesh->renderResourceBlob))
+            if (patchMesh->renderResourceBlob && patchInstance->Modifies(MeshBlobProp, aMesh->renderResourceBlob))
             {
                 if (auto& renderBlob = Red::Cast<Red::rendRenderMeshBlob>(patchMesh->renderResourceBlob))
                 {
@@ -565,12 +623,15 @@ void App::ResourcePatchExtension::OnMeshResourceLoad(Red::CMesh* aMesh, Red::Pos
                     aMesh->isShadowMesh = patchMesh->isShadowMesh;
                     aMesh->isPlayerShadowMesh = patchMesh->isPlayerShadowMesh;
                     aMesh->constrainAutoHideDistanceToTerrainHeightMap = patchMesh->constrainAutoHideDistanceToTerrainHeightMap;
+
+                    LogInfo(R"([{}] Render blob from "{}" replaced render blob of "{}".)",
+                            ExtensionName, patchPathStr, targetPathStr);
                 }
             }
         }
     }
 
-    MeshExtension::PrefetchMeshState(aMesh, fix.GetContext());
+    MeshExtension::PrepareMeshState(aMesh, fix.GetContext());
 }
 
 void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh* aMorphTarget,
@@ -581,50 +642,69 @@ void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh
 
     const auto& patchList = GetPatchList(aMorphTarget->path);
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::MorphTargetMesh>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::MorphTargetMesh>();
 
         if (!patchResource)
             continue;
 
-        const auto& patchConfig = GetPatchConfig(patchPath);
+        const auto targetPathStr = s_resourcePathRegistry->ResolvePathOrHash(aMorphTarget->path);
+        const auto patchPathStr = s_resourcePathRegistry->ResolvePathOrHash(patchResource->path);
 
-        if (patchResource->baseMesh.path && (patchConfig->Modifies(MorphTargetMeshProp)))
+        if (patchResource->baseMesh.path && patchInstance->Modifies(MorphTargetMeshProp))
         {
             aMorphTarget->baseMesh = patchResource->baseMesh;
+
+            LogInfo(R"([{}] Base mesh from "{}" replaced base mesh of "{}".)",
+                    ExtensionName, patchPathStr, targetPathStr);
         }
 
-        if (patchConfig->Modifies(MorphTargetMeshAppProp, !patchResource->baseMeshAppearance))
+        if (patchInstance->Modifies(MorphTargetMeshAppProp, !patchResource->baseMeshAppearance))
         {
             aMorphTarget->baseMeshAppearance = patchResource->baseMeshAppearance;
+
+            LogInfo(R"([{}] Base mesh appearance from "{}" replaced base mesh appearance of "{}".)",
+                    ExtensionName, patchPathStr, targetPathStr);
         }
 
-        if (patchConfig->Modifies(MorphTargetTextureProp, !patchResource->baseTexture.path))
+        if (patchInstance->Modifies(MorphTargetTextureProp, !patchResource->baseTexture.path))
         {
             aMorphTarget->baseTexture = patchResource->baseTexture;
+
+            LogInfo(R"([{}] Base texture from "{}" replaced base texture of "{}".)",
+                    ExtensionName, patchPathStr, targetPathStr);
         }
 
-        if (patchConfig->Modifies(MorphTargetTextureParamProp, !patchResource->baseTextureParamName))
+        if (patchInstance->Modifies(MorphTargetTextureParamProp, !patchResource->baseTextureParamName))
         {
             aMorphTarget->baseTextureParamName = patchResource->baseTextureParamName;
+
+            LogInfo(R"([{}] Base texture param "{}" replaced base texture param of "{}".)",
+                    ExtensionName, patchPathStr, targetPathStr);
         }
 
-        if (patchResource->blob && patchConfig->Modifies(MorphTargetBlobProp, aMorphTarget->blob))
+        if (patchResource->blob && patchInstance->Modifies(MorphTargetBlobProp, aMorphTarget->blob))
         {
             if (auto& renderBlob = Red::Cast<Red::rendRenderMorphTargetMeshBlob>(patchResource->blob))
             {
                 aMorphTarget->blob = CopyRenderBlob(renderBlob);
+
+                LogInfo(R"([{}] Render blob from "{}" replaced render blob of "{}".)",
+                        ExtensionName, patchPathStr, targetPathStr);
             }
         }
 
         if (patchResource->boundingBox.Max.X > patchResource->boundingBox.Min.X
-            && (patchConfig->Modifies(MorphTargetBoundingBoxProp)))
+            && patchInstance->Modifies(MorphTargetBoundingBoxProp))
         {
             aMorphTarget->boundingBox = patchResource->boundingBox;
+
+            LogInfo(R"([{}] Bounding box from "{}" replaced bounding box of "{}".)",
+                    ExtensionName, patchPathStr, targetPathStr);
         }
 
-        if (patchConfig->Modifies(MorphTargetTargetsProp))
+        if (patchInstance->Modifies(MorphTargetTargetsProp))
         {
             for (const auto& patchTarget : patchResource->targets)
             {
@@ -643,6 +723,15 @@ void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh
                 if (isNewTarget)
                 {
                     aMorphTarget->targets.EmplaceBack(patchTarget);
+
+                    LogInfo(R"([{}] Morph target "{}" from "{}" added to "{}".)",
+                            ExtensionName, patchTarget.name.ToString(), patchPathStr, targetPathStr);
+                }
+                else
+                {
+                    LogInfo(R"([{}] Morph target "{}" from "{}" replaced morph target "{}" of "{}".)",
+                            ExtensionName, patchTarget.name.ToString(), patchPathStr,
+                            patchTarget.name.ToString(), targetPathStr);
                 }
             }
         }
@@ -811,16 +900,14 @@ void App::ResourcePatchExtension::OnGarmentPackageExtract(Red::GarmentExtraction
 
     auto originalEntityTemplate = aParams->partTemplate;
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::EntityTemplate>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::EntityTemplate>();
 
         if (!patchResource)
             continue;
 
-        const auto& patchConfig = GetPatchConfig(patchPath);
-
-        if (patchConfig->Modifies(EntityTemplateComponentsProp))
+        if (patchInstance->Modifies(EntityTemplateComponentsProp))
         {
             aParams->partTemplate = patchResource;
             Raw::GarmentAssembler::ExtractComponentsJob(aParams, aJobGroup);
@@ -831,6 +918,42 @@ void App::ResourcePatchExtension::OnGarmentPackageExtract(Red::GarmentExtraction
 }
 #endif
 
+void App::ResourcePatchExtension::OnStreamingWorldLoad(Red::worldStreamingWorld* aWorld)
+{
+    const auto& patchList = GetPatchList(aWorld->path);
+
+    if (patchList.empty())
+        return;
+
+    LogInfo("[{}] World streaming is initializing...", ExtensionName);
+    bool allSucceeded = true;
+
+    for (const auto& patchInstance : patchList)
+    {
+        auto patchToken = patchInstance->GetToken<Red::worldStreamingBlock>();
+
+        if (!patchToken)
+        {
+            allSucceeded = false;
+            continue;
+        }
+
+        aWorld->blockRefs.EmplaceBack();
+
+        auto& blockRef = aWorld->blockRefs.Back();
+        blockRef.path = patchToken->path;
+        blockRef.token = patchToken;
+
+        LogInfo("[{}] Merging streaming block \"{}\"...", ExtensionName,
+                s_resourcePathRegistry->ResolvePathOrHash(patchToken->path));
+    }
+
+    if (allSucceeded)
+        LogInfo("[{}] All streaming blocks merged.", ExtensionName);
+    else
+        LogWarning("[{}] Streaming blocks merged with issues.", ExtensionName);
+}
+
 void App::ResourcePatchExtension::OnCurveSetResourceLoad(Red::CurveSet* aResource)
 {
     const auto& patchList = GetPatchList(aResource->path);
@@ -838,9 +961,9 @@ void App::ResourcePatchExtension::OnCurveSetResourceLoad(Red::CurveSet* aResourc
     if (patchList.empty())
         return;
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::CurveSet>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::CurveSet>();
 
         if (!patchResource)
             continue;
@@ -893,15 +1016,14 @@ void App::ResourcePatchExtension::OnDeviceResourceLoad(Red::gameDeviceResource* 
 
     auto deviceMap = std::bit_cast<Red::HashMap<uint64_t, Red::gameCookedDeviceData>*>(&aResource->data->unk30);
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::gameDeviceResource>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::gameDeviceResource>();
 
         if (!patchResource)
             continue;
 
         auto patchMap = std::bit_cast<Red::HashMap<uint64_t, Red::gameCookedDeviceData>*>(&patchResource->data->unk30);
-
         patchMap->ForEach([&deviceMap](const uint64_t& aKey, const Red::gameCookedDeviceData& aData)
                           {
                               deviceMap->InsertOrAssign(aKey, aData);
@@ -926,14 +1048,50 @@ void App::ResourcePatchExtension::OnSetPersistentStateData(uint64_t a1, Red::Dat
     if (patchList.empty())
         return;
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::gamePersistentStateDataResource>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::gamePersistentStateDataResource>();
 
         if (!patchResource)
             continue;
 
         Raw::PersistencySystem::SetPersistentStateData(a1, patchResource->buffer, a3, a4);
+    }
+}
+
+void App::ResourcePatchExtension::OnInkAnimResourceLoad(Red::inkanimAnimationLibraryResource* aResource)
+{
+    const auto& patchList = GetPatchList(aResource->path);
+
+    if (patchList.empty())
+        return;
+
+    for (const auto& patchInstance : patchList)
+    {
+        auto patchResource = patchInstance->GetResource<Red::inkanimAnimationLibraryResource>();
+
+        if (!patchResource)
+            continue;
+
+        for (const auto& patchEntry : patchResource->sequences)
+        {
+            auto isNewEntry = true;
+
+            for (auto& existingEntry : aResource->sequences)
+            {
+                if (existingEntry->name == patchEntry->name)
+                {
+                    isNewEntry = false;
+                    existingEntry = patchEntry;
+                    break;
+                }
+            }
+
+            if (isNewEntry)
+            {
+                aResource->sequences.PushBack(patchEntry);
+            }
+        }
     }
 }
 
@@ -947,7 +1105,7 @@ void App::ResourcePatchExtension::IncludeAppearanceParts(const Red::Handle<Red::
     if (!aResource || !aDefinition)
         return;
 
-    if (aDefinition->partsValues.size == 0)
+    if (aDefinition->partsValues.IsEmpty())
         return;
 
     if (!aForceIncludeParts && !aDefinition->visualTags.Contains(AppearancePartsTag))
@@ -961,7 +1119,7 @@ void App::ResourcePatchExtension::IncludeAppearanceParts(const Red::Handle<Red::
 
         jobQueue.Wait(partToken->job);
         jobQueue.Dispatch([partToken = std::move(partToken), &aResultObjects, aDisablePostLoad, aDisableImports,
-                           aDisablePreInitialization]() {
+                           aDisablePreInitialization, aResource, aDefinition]() {
             if (partToken->IsFailed())
                 return;
 
@@ -976,9 +1134,9 @@ void App::ResourcePatchExtension::IncludeAppearanceParts(const Red::Handle<Red::
             partExtractor.disablePreInitialization = aDisablePreInitialization;
             partExtractor.ExtractSync();
 
-            if (partExtractor.results.size > 0)
+            if (!partExtractor.results.IsEmpty())
             {
-                MergeComponents(aResultObjects, partExtractor.results, true);
+                MergeComponents(aResultObjects, partExtractor.results, true, partToken->path, aResource->path);
 
                 // TODO: Process external components and components overrides
             }
@@ -1004,17 +1162,15 @@ void App::ResourcePatchExtension::PatchPackageResults(const Red::Handle<Red::Ent
     if (patchList.empty())
         return;
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchResource = GetPatchResource<Red::EntityTemplate>(patchPath);
+        auto patchResource = patchInstance->GetResource<Red::EntityTemplate>();
 
         if (!patchResource)
             continue;
 
-        const auto& patchConfig = GetPatchConfig(patchPath);
-
-        if (!patchConfig->Modifies(EntityTemplateEntityProp) &&
-            !patchConfig->Modifies(EntityTemplateComponentsProp))
+        if (!patchInstance->Modifies(EntityTemplateEntityProp) &&
+            !patchInstance->Modifies(EntityTemplateComponentsProp))
             continue;
 
         auto& patchBuffer = patchResource->compiledData;
@@ -1041,14 +1197,14 @@ void App::ResourcePatchExtension::PatchPackageResults(const Red::Handle<Red::Ent
         patchExtractor.disablePreInitialization = aDisablePreInitialization;
         patchExtractor.ExtractSync();
 
-        if (patchExtractor.results.size > 0)
+        if (!patchExtractor.results.IsEmpty())
         {
-            if (patchConfig->Modifies(EntityTemplateComponentsProp))
+            if (patchInstance->Modifies(EntityTemplateComponentsProp))
             {
-                MergeComponents(aResultObjects, patchExtractor.results, false);
+                MergeComponents(aResultObjects, patchExtractor.results, false, patchResource->path, aTemplate->path);
             }
 
-            if (patchConfig->Modifies(EntityTemplateEntityProp))
+            if (patchInstance->Modifies(EntityTemplateEntityProp))
             {
                 MergeEntity(aResultObjects, patchExtractor.results, templateHeader.rootIndex, patchHeader.rootIndex);
             }
@@ -1074,9 +1230,9 @@ void App::ResourcePatchExtension::PatchPackageResults(const Red::Handle<Red::App
 
     Red::JobQueue jobQueue{aJobGroup};
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        auto patchDefinition = GetPatchAppearance(patchPath, aDefinition->name);
+        auto patchDefinition = patchInstance->GetAppearanceDefinition(aDefinition->name);
 
         if (!patchDefinition)
             continue;
@@ -1085,7 +1241,8 @@ void App::ResourcePatchExtension::PatchPackageResults(const Red::Handle<Red::App
 
         jobQueue.Wait(patchBufferToken->job);
         jobQueue.Dispatch([patchDefinition = std::move(patchDefinition), &aResultObjects, aDisablePostLoad,
-                           aDisableImports, aDisablePreInitialization](const Red::JobGroup& aJobGroup) {
+                           aDisableImports, aDisablePreInitialization, patchPath = patchInstance->path, aResource,
+                           aDefinition](const Red::JobGroup& aJobGroup) {
             auto patchReader = Red::ObjectPackageReader(patchDefinition->compiledData);
             patchReader.ReadHeader(patchDefinition->compiledDataHeader);
 
@@ -1098,10 +1255,12 @@ void App::ResourcePatchExtension::PatchPackageResults(const Red::Handle<Red::App
 
             Red::JobQueue jobQueue{aJobGroup};
             jobQueue.Wait(patchExtractionJob);
-            jobQueue.Dispatch([patchExtractor = std::move(patchExtractor), &aResultObjects]() {
-                if (patchExtractor->results.size > 0)
+            jobQueue.Dispatch([patchExtractor = std::move(patchExtractor), &aResultObjects, patchPath, patchDefinition,
+                               aResource, aDefinition]() {
+                if (!patchExtractor->results.IsEmpty())
                 {
-                    MergeComponents(aResultObjects, patchExtractor->results, false);
+                    MergeComponents(aResultObjects, patchExtractor->results, false, patchPath, aResource->path,
+                                    patchDefinition->name, aDefinition->name);
                 }
             });
         });
@@ -1112,10 +1271,10 @@ void App::ResourcePatchExtension::MergeEntity(Red::DynArray<Red::Handle<Red::ISe
                                               Red::DynArray<Red::Handle<Red::ISerializable>>& aPatchObjects,
                                               int16_t aResultEntityIndex, int16_t aPatchEntityIndex)
 {
-    if (aResultEntityIndex < 0 || aResultEntityIndex >= aResultObjects.size)
+    if (aResultEntityIndex < 0 || aResultEntityIndex >= aResultObjects.Size())
         return;
 
-    if (aPatchEntityIndex < 0 || aPatchEntityIndex >= aPatchObjects.size)
+    if (aPatchEntityIndex < 0 || aPatchEntityIndex >= aPatchObjects.Size())
         return;
 
     if (auto patchEntity = Red::Cast<Red::Entity>(aPatchObjects[aPatchEntityIndex]))
@@ -1129,8 +1288,13 @@ void App::ResourcePatchExtension::MergeEntity(Red::DynArray<Red::Handle<Red::ISe
 
 void App::ResourcePatchExtension::MergeComponents(Red::DynArray<Red::Handle<Red::ISerializable>>& aResultObjects,
                                                   Red::DynArray<Red::Handle<Red::ISerializable>>& aPatchObjects,
-                                                  bool aPartMerge)
+                                                  bool aPartMerge, Red::ResourcePath aPatchPath,
+                                                  Red::ResourcePath aTargetPath, Red::CName aPatchDefinition,
+                                                  Red::CName aTargetDefinition)
 {
+    const auto targetPathStr = s_resourcePathRegistry->ResolvePathOrHash(aTargetPath);
+    const auto patchPathStr = s_resourcePathRegistry->ResolvePathOrHash(aPatchPath);
+
     for (auto& patchObject : aPatchObjects)
     {
         if (auto patchComponent = Red::Cast<Red::IComponent>(patchObject))
@@ -1151,29 +1315,52 @@ void App::ResourcePatchExtension::MergeComponents(Red::DynArray<Red::Handle<Red:
                 }
             }
 
-            if (isNewComponent && (!aPartMerge || !Red::IsInstanceOf<Red::entExternalComponent>(patchComponent)))
+            if (isNewComponent)
             {
-                aResultObjects.PushBack(std::move(patchComponent));
+                if (!aPartMerge || !Red::IsInstanceOf<Red::entExternalComponent>(patchComponent))
+                {
+                    if (aPatchDefinition)
+                    {
+                        LogInfo(R"([{}] Component "{}" from "{}" of "{}" added to "{}" of "{}".)", ExtensionName,
+                                patchComponent->name.ToString(), aPatchDefinition.ToString(), patchPathStr,
+                                aTargetDefinition.ToString(), targetPathStr);
+                    }
+                    else if (aTargetDefinition)
+                    {
+                        LogInfo(R"([{}] Component "{}" from "{}" added to "{}" of "{}".)", ExtensionName,
+                                patchComponent->name.ToString(), patchPathStr, aTargetDefinition.ToString(),
+                                targetPathStr);
+                    }
+                    else
+                    {
+                        LogInfo(R"([{}] Component "{}" from "{}" added to "{}".)", ExtensionName,
+                                patchComponent->name.ToString(), patchPathStr, targetPathStr);
+                    }
+
+                    aResultObjects.PushBack(std::move(patchComponent));
+                }
+            }
+            else
+            {
+                if (aPatchDefinition)
+                {
+                    LogInfo(R"([{}] Component "{}" from "{}" of "{}" replaced component in "{}" of "{}".)", ExtensionName,
+                            patchComponent->name.ToString(), aPatchDefinition.ToString(), patchPathStr,
+                            aTargetDefinition.ToString(), targetPathStr);
+                }
+                else if (aTargetDefinition)
+                {
+                    LogInfo(R"([{}] Component "{}" from "{}" replaced component in "{}" of "{}".)", ExtensionName,
+                            patchComponent->name.ToString(), patchPathStr, aTargetDefinition.ToString(),
+                            targetPathStr);
+                }
+                else
+                {
+                    LogInfo(R"([{}] Component "{}" from "{}" replaced component in "{}".)", ExtensionName,
+                            patchComponent->name.ToString(), patchPathStr, targetPathStr);
+                }
             }
         }
-    }
-}
-
-void App::ResourcePatchExtension::MergeObjects(Red::DynArray<Red::Handle<Red::ISerializable>>& aResultObjects,
-                                               Red::DynArray<Red::Handle<Red::ISerializable>>& aPatchObjects)
-{
-    for (auto& patchObject : aPatchObjects)
-    {
-        aResultObjects.PushBack(patchObject);
-    }
-}
-
-void App::ResourcePatchExtension::MergeResources(Red::DynArray<Red::SharedPtr<Red::ResourceToken<>>>& aResultResources,
-                                                 Red::DynArray<Red::SharedPtr<Red::ResourceToken<>>>& aPatchResources)
-{
-    for (auto& patchResource : aPatchResources)
-    {
-        aResultResources.PushBack(patchResource);
     }
 }
 
@@ -1206,58 +1393,103 @@ Red::Handle<Red::rendRenderMorphTargetMeshBlob> App::ResourcePatchExtension::Cop
     return cloneBlob;
 }
 
-Core::SharedPtr<App::ResourcePatch> App::ResourcePatchExtension::GetPatchConfig(
-    Red::ResourcePath aPatchPath)
+const Core::Vector<App::ResourcePatchExtension::PatchInstancePtr>& App::ResourcePatchExtension::GetPatchList(
+    Red::ResourcePath aTargetPath)
 {
-    const auto& patchIt = s_patches.find(aPatchPath);
+    static const Core::Vector<PatchInstancePtr> s_null;
 
-    if (patchIt == s_patches.end())
-        return {};
+    const auto& patchIt = s_targetPatches.find(aTargetPath);
 
-    return patchIt->second;
-}
-
-const Core::Vector<Red::ResourcePath>& App::ResourcePatchExtension::GetPatchList(Red::ResourcePath aTargetPath)
-{
-    static const Core::Vector<Red::ResourcePath> s_null;
-
-    const auto& patchIt = s_patchTargets.find(aTargetPath);
-
-    if (patchIt == s_patchTargets.end())
+    if (patchIt == s_targetPatches.end())
         return s_null;
 
     return patchIt->second;
 }
 
-void App::ResourcePatchExtension::LoadPatchResource(Red::ResourcePath aPatchPath)
-{
-    std::unique_lock _(s_patchTokenLock);
-
-    if (s_patchTokens.contains(aPatchPath))
-        return;
-
-    // Red::ResourceRequest patchRequest;
-    // patchRequest.path = aPatchPath;
-    // patchRequest.disablePreInitialization = true;
-    // patchRequest.disablePostLoad = true;
-    // s_tokens[aPatchPath] = Red::ResourceLoader::Get()->LoadAsync(patchRequest);
-
-    s_patchTokens[aPatchPath] = Red::ResourceLoader::Get()->LoadAsync(aPatchPath);
-}
-
 bool App::ResourcePatchExtension::IsPatchResource(Red::ResourcePath aPath)
 {
-    std::shared_lock _(s_patchTokenLock);
+    return s_patches.contains(aPath);
+}
 
-    return s_patchTokens.contains(aPath);
+bool App::ResourcePatchExtension::IsPatched(const Red::Handle<Red::meshMeshAppearance>& aAppearance)
+{
+    return aAppearance->tags.Size() == 3 && aAppearance->tags[0] == ResourcePatchTag;
+}
+
+Red::CName App::ResourcePatchExtension::GetExpansionName(const Red::Handle<Red::meshMeshAppearance>& aAppearance)
+{
+    return aAppearance->tags.Size() == 3 ? aAppearance->tags[1]
+                                         : (aAppearance->tags.Size() == 1 ? aAppearance->tags[0] : "");
+}
+
+Red::CName App::ResourcePatchExtension::GetPatchSource(const Red::Handle<Red::meshMeshAppearance>& aAppearance)
+{
+    return aAppearance->tags.Size() == 3 ? aAppearance->tags[2] : "";
+}
+
+void App::ResourcePatchExtension::RegisterPatch(Red::ResourcePath aTargetPath, Red::ResourcePath aPatchPath)
+{
+    auto patchInstance = s_dynamicPatches[aPatchPath];
+
+    if (!patchInstance)
+    {
+        patchInstance = Core::MakeShared<PatchInstance>(aPatchPath);
+        s_dynamicPatches[aPatchPath] = patchInstance;
+    }
+
+    patchInstance->targets.insert(aTargetPath);
+
+    s_targetPatches[aTargetPath].push_back(patchInstance);
+}
+
+void App::ResourcePatchExtension::RegisterPatch(Red::ResourcePath aTargetPath, const char* aPatchPathStr)
+{
+    RegisterPatch(aTargetPath, s_resourcePathRegistry->RegisterPath(aPatchPathStr));
+}
+
+bool App::ResourcePatchExtension::PatchInstance::Modifies(Red::CName aProp) const
+{
+    return props.empty() || props.contains(aProp);
+}
+
+bool App::ResourcePatchExtension::PatchInstance::Modifies(Red::CName aProp, bool aOverwrite) const
+{
+    return (!aOverwrite && props.empty()) || props.contains(aProp);
+}
+
+App::ResourcePatchExtension::PatchInstance::PatchInstance(Red::ResourcePath aSource)
+    : path(aSource)
+{
+}
+
+App::ResourcePatchExtension::PatchInstance::PatchInstance(Red::ResourcePath aSource,
+                                                          Core::Set<Red::ResourcePath> aTargets,
+                                                          Core::Set<Red::CName> aProps,
+                                                          int32_t aOrder)
+    : path(aSource)
+    , targets(std::move(aTargets))
+    , props(std::move(aProps))
+    , order(aOrder)
+{
+}
+
+void App::ResourcePatchExtension::PatchInstance::LoadResource()
+{
+    std::unique_lock _(tokenLock);
+
+    if (!token)
+    {
+        token = Red::ResourceLoader::Get()->LoadAsync(path);
+    }
 }
 
 template<typename T>
-Red::SharedPtr<Red::ResourceToken<T>> App::ResourcePatchExtension::GetPatchToken(Red::ResourcePath aPatchPath)
+Red::ResourceTokenPtr<T> App::ResourcePatchExtension::PatchInstance::GetToken() const
 {
-    std::shared_lock _(s_patchTokenLock);
+    std::shared_lock _(tokenLock);
 
-    auto& token = s_patchTokens[aPatchPath];
+    if (!token)
+        return {};
 
     if constexpr (!std::is_same_v<T, Red::CResource>)
     {
@@ -1284,49 +1516,58 @@ Red::SharedPtr<Red::ResourceToken<T>> App::ResourcePatchExtension::GetPatchToken
                 }
             }
         }
+
+        if (!Red::IsInstanceOf<T>(token->resource))
+        {
+            LogError("[{}] Patch resource \"{}\" is expected to be {}, got {}.",
+                     ExtensionName, s_resourcePathRegistry->ResolvePathOrHash(token->path),
+                     Red::GetTypeName<T>().ToString(), token->resource->GetType()->GetName().ToString());
+            return {};
+        }
     }
 
-    return *reinterpret_cast<Red::SharedPtr<Red::ResourceToken<T>>*>(&token);
+    return Red::Cast<T>(token);
 }
 
 template<typename T>
-Red::Handle<T> App::ResourcePatchExtension::GetPatchResource(Red::ResourcePath aPatchPath)
+Red::Handle<T> App::ResourcePatchExtension::PatchInstance::GetResource() const
 {
-    auto token = GetPatchToken<T>(aPatchPath);
+    auto typedToken = GetToken<T>();
 
-    if (!token)
+    if (!typedToken)
         return {};
 
-    return token->resource;
+    return typedToken->resource;
 }
 
-Red::Handle<Red::AppearanceDefinition> App::ResourcePatchExtension::GetPatchAppearance(
-    Red::ResourcePath aPatchPath, Red::CName aDefinitionName)
+void App::ResourcePatchExtension::PatchInstance::PrefetchAppearance(
+    const Red::Handle<Red::AppearanceDefinition>& aDefinition)
 {
-    std::shared_lock _(s_appearanceDefinitionLock);
+    std::unique_lock _(appearanceLock);
 
-    const auto& resourceIt = s_appearanceDefinitions.find(aPatchPath);
-    if (resourceIt == s_appearanceDefinitions.end())
-        return {};
+    appearances[aDefinition->name] = aDefinition;
 
-    const auto& definitionIt = resourceIt->second.find(aDefinitionName);
-    if (definitionIt == resourceIt->second.end())
-        return {};
-
-    return definitionIt->second.first;
+    if (aDefinition->name.IsNone())
+    {
+        if (aDefinition->compiledData.state == Red::DeferredDataBufferState::Unloaded)
+        {
+            aDefinition->compiledData.LoadAsync();
+        }
+    }
 }
 
-bool App::ResourcePatchExtension::IsPatched(const Red::Handle<Red::meshMeshAppearance>& aAppearance)
+Red::Handle<Red::AppearanceDefinition> App::ResourcePatchExtension::PatchInstance::GetAppearanceDefinition(
+    Red::CName aName)
 {
-    return aAppearance->tags.size == 3 && aAppearance->tags[0] == ResourcePatchTag;
-}
+    std::shared_lock _(appearanceLock);
 
-Red::CName App::ResourcePatchExtension::GetExpansionName(const Red::Handle<Red::meshMeshAppearance>& aAppearance)
-{
-    return aAppearance->tags.size == 3 ? aAppearance->tags[1] : "";
-}
+    auto appearanceIt = appearances.find(aName);
+    if (appearanceIt != appearances.end())
+        return appearanceIt->second;
 
-Red::CName App::ResourcePatchExtension::GetPatchSource(const Red::Handle<Red::meshMeshAppearance>& aAppearance)
-{
-    return aAppearance->tags.size == 3 ? aAppearance->tags[2] : "";
+    appearanceIt = appearances.find({});
+    if (appearanceIt != appearances.end())
+        return appearanceIt->second;
+
+    return {};
 }

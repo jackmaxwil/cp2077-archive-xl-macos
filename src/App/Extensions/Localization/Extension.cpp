@@ -81,8 +81,8 @@ void App::LocalizationExtension::OnLoadTexts(Red::Handle<TextResource>& aOnScree
     if (!m_configs.empty())
     {
         auto& entryList = aOnScreens->entries;
-        auto originalCount = entryList.size;
-        auto originalMaxKey = (entryList.End() - 1)->primaryKey;
+        auto originalCount = entryList.Size();
+        auto originalMaxKey = entryList.Back().primaryKey;
         auto usedKeyMap = TextEntryMap();
 
         for (const auto& unit : m_configs)
@@ -156,7 +156,7 @@ bool App::LocalizationExtension::MergeTextResource(const std::string& aPath, Tex
     bool success = true;
     auto& newEntries = resource.GetPtr()->entries;
 
-    for (uint32_t i = 0; i < newEntries.size; ++i)
+    for (uint32_t i = 0; i < newEntries.Size(); ++i)
     {
         auto& newEntry = newEntries[i];
 
@@ -210,12 +210,12 @@ void App::LocalizationExtension::MergeTextEntry(TextEntryList& aFinalList, TextE
             }
         }
 
-        aUsedKeyMap.emplace(aNewEntry.primaryKey, aFinalList.size);
+        aUsedKeyMap.emplace(aNewEntry.primaryKey, aFinalList.Size());
         aFinalList.EmplaceBack(aNewEntry);
     }
     else if (!aFallback)
     {
-        auto* originalEntry = aFinalList.Begin() + existingIt->second;
+        auto* originalEntry = aFinalList.Data() + existingIt->second;
 
         if (!aExtraEntry)
         {
@@ -242,7 +242,7 @@ App::TextEntry* App::LocalizationExtension::FindSameTextEntry(TextEntry& aEntry,
     if (it == end || it->primaryKey != aEntry.primaryKey)
         return nullptr;
 
-    return it;
+    return it.Base();
 }
 
 bool App::LocalizationExtension::IsCommentEntry(App::TextEntry& aEntry)
@@ -343,7 +343,7 @@ void App::LocalizationExtension::OnLoadVoiceOvers(void* aContext, uint64_t a2)
     {
         auto depot = Red::ResourceDepot::Get();
         auto& tokens = Raw::Localization::VoiceOverTokens::Ref(aContext);
-        auto map = tokens.Get(0)->entries[0]->resource->root.GetPtr<Red::locVoLanguageDataMap>();
+        auto map = tokens.Get(0)->Data()[0]->resource->root.GetPtr<Red::locVoLanguageDataMap>();
 
         for (auto& entry : map->entries)
         {
@@ -429,7 +429,7 @@ void App::LocalizationExtension::OnLoadLipsyncs(void* aContext, uint8_t a2)
             }
         }
 
-        if (tokens.size)
+        if (!tokens.IsEmpty())
         {
             Red::WaitForResources(tokens, std::chrono::milliseconds(5000));
 
@@ -493,12 +493,12 @@ void App::LocalizationExtension::OnLoadLipsyncs(void* aContext, uint8_t a2)
 bool App::LocalizationExtension::MergeLipsyncResource(const Red::Handle<Red::animLipsyncMapping>& aSource,
                                                    Red::Handle<Red::animLipsyncMapping>& aTarget)
 {
-    if (aSource->scenePaths.size != aSource->sceneEntries.size)
+    if (aSource->scenePaths.Size() != aSource->sceneEntries.Size())
         return false;
 
     LogInfo("[{}] Merging entries from \"{}\"...", ExtensionName, s_paths[aSource->path]);
 
-    for (uint32_t i = 0; i < aSource->scenePaths.size; ++i)
+    for (uint32_t i = 0; i < aSource->scenePaths.Size(); ++i)
     {
         auto& path = aSource->scenePaths[i];
         auto& entry = aSource->sceneEntries[i];

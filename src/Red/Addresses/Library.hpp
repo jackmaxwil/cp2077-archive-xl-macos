@@ -23,7 +23,7 @@ constexpr uint32_t AppearanceDefinition_ExtractPartComponents = 39206067;
 
 constexpr uint32_t AppearanceNameVisualTagsPreset_GetVisualTags = 1186798404;
 
-constexpr uint32_t AppearanceResource_OnLoad = 3141736993;
+constexpr uint32_t AppearanceResource_PostLoad = 3141736993;
 constexpr uint32_t AppearanceResource_FindAppearanceDefinition = 549398675;
 
 constexpr uint32_t AttachmentSlots_InitializeSlots = 3224838039;
@@ -187,6 +187,8 @@ constexpr uint32_t ResourceSerializer_OnResourceReady = 1147149338;
 constexpr uint32_t StreamingSector_PostLoad = 3972601611;
 
 constexpr uint32_t StreamingWorld_Serialize = 410718963;
+
+constexpr uint32_t RuntimeSystemWorldStreaming_LoadWorldJob = 2872059340;
 
 constexpr uint32_t TPPRepresentationComponent_OnAttach = 4129169021;
 constexpr uint32_t TPPRepresentationComponent_OnItemEquipped = 4010810747;

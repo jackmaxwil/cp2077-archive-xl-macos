@@ -38,6 +38,7 @@ constexpr auto SkinColorAttr = Red::CName("skin_color");
 constexpr auto HairTypeAttr = Red::CName("hair_type");
 constexpr auto HairColorAttr = Red::CName("hair_color");
 constexpr auto EyesColorAttr = Red::CName("eyes_color");
+constexpr auto NailsColorAttr = Red::CName("nails_color");
 constexpr auto VariantAttr = Red::CName("variant");
 
 constexpr auto GenderSuffix = Red::TweakDBID("itemsFactoryAppearanceSuffix.Gender");
@@ -61,9 +62,15 @@ constexpr auto DefaultFeetStateSuffixValue = "Flat";
 constexpr auto MaleBodyComponent = Red::CName("t0_000_pma_base__full");
 constexpr auto FemaleBodyComponent1 = Red::CName("t0_000_pwa_base__full");
 constexpr auto FemaleBodyComponent2 = Red::CName("t0_000_pwa_fpp__torso");
-
 constexpr auto MaleEyesComponent = Red::CName("he_000_pma__basehead");
 constexpr auto FemaleEyesComponent = Red::CName("MorphTargetSkinnedMesh3637");
+constexpr auto MaleNailsComponent = Red::CName("a0_000_pma_base__nails_l");
+constexpr auto FemaleNailsComponent1 = Red::CName("a0_000_pwa_fpp__nails_l");
+constexpr auto FemaleNailsComponent2 = Red::CName("a0_000_pwa_base_nails_l");
+constexpr auto NailsGroup = Red::CName("unholstered_mantis");
+constexpr auto NailsOption = Red::CName("u_mantise_nails_color");
+constexpr auto NailsColorPrefix = "a0_000_pwa_base__nails_";
+constexpr auto NailsColorPrefixLength = std::char_traits<char>::length(NailsColorPrefix);
 
 const std::string s_emptyPathStr;
 
@@ -78,8 +85,14 @@ const bool s_fallbackVariants[4][2] = {
     {false, true},
     {true, true},
 };
+}
 
-Red::CName ExtractName(const char* aName, size_t aOffset, size_t aSize, bool aRegister = false)
+Red::CName App::ExtractDynamicName(const char* aName, size_t aOffset, bool aRegister)
+{
+    return ExtractDynamicName(aName, aOffset, strlen(aName) - aOffset, aRegister);
+}
+
+Red::CName App::ExtractDynamicName(const char* aName, size_t aOffset, size_t aSize, bool aRegister)
 {
     if (!aSize)
         return {};
@@ -91,7 +104,6 @@ Red::CName ExtractName(const char* aName, size_t aOffset, size_t aSize, bool aRe
     }
 
     return Red::FNV1a64(reinterpret_cast<const uint8_t*>(aName + aOffset), aSize);
-}
 }
 
 App::DynamicAppearanceName::DynamicAppearanceName()
@@ -128,13 +140,13 @@ App::DynamicAppearanceName::DynamicAppearanceName(Red::CName aAppearance)
         }
 
         isDynamic = true;
-        name = ExtractName(str.data(), 0, markerPos);
+        name = ExtractDynamicName(str.data(), 0, markerPos);
 
         str.remove_prefix(markerPos + 1);
 
         if (!str.empty())
         {
-            variant = ExtractName(str.data(), 0, str.size(), true);
+            variant = ExtractDynamicName(str.data(), 0, str.size(), true);
             parts[VariantAttr] = variant;
 
             uint8_t partNum[2]{PartNameGlue, '1'};
@@ -163,15 +175,15 @@ App::DynamicAppearanceName::DynamicAppearanceName(Red::CName aAppearance)
                 auto assignPos = str.find(ConditionEqual);
                 if (assignPos != std::string_view::npos && assignPos < markerPos)
                 {
-                    auto partName = ExtractName(str.data(), 0, assignPos, true);
-                    auto partValue = ExtractName(str.data(), assignPos + 1, markerPos - assignPos - 1, true);
+                    auto partName = ExtractDynamicName(str.data(), 0, assignPos, true);
+                    auto partValue = ExtractDynamicName(str.data(), assignPos + 1, markerPos - assignPos - 1, true);
                     parts[partName] = partValue;
                     overrides.insert(Red::FNV1a64(str.data(), markerPos - assignPos));
                 }
                 else
                 {
                     auto partName = Red::FNV1a64(partNum, 2, VariantAttr);
-                    auto partValue = ExtractName(str.data(), 0, markerPos, true);
+                    auto partValue = ExtractDynamicName(str.data(), 0, markerPos, true);
                     parts[partName] = partValue;
                     ++partNum[1];
                 }
@@ -184,6 +196,11 @@ App::DynamicAppearanceName::DynamicAppearanceName(Red::CName aAppearance)
     {
         name = aAppearance;
     }
+}
+
+App::DynamicAppearanceName::DynamicAppearanceName(const Red::CString& aAppearance)
+    : DynamicAppearanceName(Red::CNamePool::Add(aAppearance.c_str()))
+{
 }
 
 bool App::DynamicAppearanceName::CheckMark(Red::CName aAppearance)
@@ -203,7 +220,7 @@ App::DynamicAppearanceRef::DynamicAppearanceRef(Red::CName aReference)
     if (markerPos != std::string_view::npos)
     {
         isDynamic = true;
-        name = ExtractName(str.data(), 0, markerPos);
+        name = ExtractDynamicName(str.data(), 0, markerPos);
 
         str.remove_prefix(markerPos);
 
@@ -224,12 +241,12 @@ App::DynamicAppearanceRef::DynamicAppearanceRef(Red::CName aReference)
 
                     if (markerPos == std::string_view::npos)
                     {
-                        variants.insert(ExtractName(str.data(), 0, str.size()));
+                        variants.insert(ExtractDynamicName(str.data(), 0, str.size()));
                         // don't remove prefix for condition marker check
                         break;
                     }
 
-                    variants.insert(ExtractName(str.data(), 0, markerPos));
+                    variants.insert(ExtractDynamicName(str.data(), 0, markerPos));
 
                     if (str[markerPos] != VariantMarker)
                     {
@@ -251,11 +268,11 @@ App::DynamicAppearanceRef::DynamicAppearanceRef(Red::CName aReference)
 
                     if (markerPos == std::string_view::npos)
                     {
-                        conditions.insert(ExtractName(str.data(), 0, str.size()));
+                        conditions.insert(ExtractDynamicName(str.data(), 0, str.size()));
                         break;
                     }
 
-                    conditions.insert(ExtractName(str.data(), 0, markerPos));
+                    conditions.insert(ExtractDynamicName(str.data(), 0, markerPos));
 
                     str.remove_prefix(markerPos + 1);
                 }
@@ -315,7 +332,7 @@ App::DynamicAppearanceRef App::DynamicAppearanceController::ParseReference(Red::
 }
 
 bool App::DynamicAppearanceController::MatchReference(const DynamicAppearanceRef& aReference, Red::Entity* aEntity,
-                                                      const DynamicAppearanceName& aApperance) const
+                                                      const DynamicAppearanceName& aApperance)
 {
     if (!aReference.variants.empty() )
     {
@@ -332,6 +349,9 @@ bool App::DynamicAppearanceController::MatchReference(const DynamicAppearanceRef
 
         const auto& state = stateIt->second;
 
+        if (!state.valid)
+            CollectStateData(aEntity);
+
         if (!aReference.Match(state.conditions, aApperance.overrides))
             return false;
     }
@@ -339,8 +359,35 @@ bool App::DynamicAppearanceController::MatchReference(const DynamicAppearanceRef
     return true;
 }
 
+Red::CString App::DynamicAppearanceController::ResolveString(Red::Entity* aEntity, const App::DynamicPartList& aVariant,
+                                                             const Red::CString& aString)
+{
+    if (!IsDynamicValue(aString))
+        return aString;
+
+    const auto stateIt = m_states.find(aEntity);
+
+    if (stateIt == m_states.end())
+        return aString;
+
+    const auto& state = stateIt->second;
+
+    if (!state.valid)
+        CollectStateData(aEntity);
+
+    const auto result = ProcessString(state.values, aVariant, aString.c_str());
+
+    if (!result.valid)
+        return aString;
+
+    if (result.optional && result.missed)
+        return {};
+
+    return result.value.data();
+}
+
 Red::CName App::DynamicAppearanceController::ResolveName(Red::Entity* aEntity, const DynamicPartList& aVariant,
-                                                         Red::CName aName) const
+                                                         Red::CName aName)
 {
     const auto nameStr = aName.ToString();
 
@@ -353,6 +400,10 @@ Red::CName App::DynamicAppearanceController::ResolveName(Red::Entity* aEntity, c
         return aName;
 
     const auto& state = stateIt->second;
+
+    if (!state.valid)
+        CollectStateData(aEntity);
+
     const auto result = ProcessString(state.values, aVariant, nameStr);
 
     if (!result.valid)
@@ -365,7 +416,7 @@ Red::CName App::DynamicAppearanceController::ResolveName(Red::Entity* aEntity, c
 }
 
 Red::ResourcePath App::DynamicAppearanceController::ResolvePath(Red::Entity* aEntity, const DynamicPartList& aVariant,
-                                                                Red::ResourcePath aPath) const
+                                                                Red::ResourcePath aPath)
 {
     const auto pathStr = GetPathString(aPath);
 
@@ -378,6 +429,10 @@ Red::ResourcePath App::DynamicAppearanceController::ResolvePath(Red::Entity* aEn
         return aPath;
 
     const auto& state = stateIt->second;
+
+    if (!state.valid)
+        CollectStateData(aEntity);
+
     auto result = ProcessString(state.values, aVariant, pathStr.data());
 
     if (!result.valid)
@@ -387,7 +442,6 @@ Red::ResourcePath App::DynamicAppearanceController::ResolvePath(Red::Entity* aEn
         return {};
 
     Red::ResourcePath resultPath = result.value.data();
-
     m_pathRegistry->RegisterPath(resultPath, result.value);
 
     if (!Red::ResourceDepot::Get()->ResourceExists(resultPath))
@@ -556,7 +610,7 @@ App::DynamicAppearanceController::DynamicString App::DynamicAppearanceController
     return result;
 }
 
-void App::DynamicAppearanceController::UpdateState(Red::Entity* aEntity, Red::TweakDBID aEquippedItemID)
+void App::DynamicAppearanceController::CollectStateData(Red::Entity* aEntity)
 {
     auto& state = m_states[aEntity];
 
@@ -566,18 +620,19 @@ void App::DynamicAppearanceController::UpdateState(Red::Entity* aEntity, Red::Tw
         state.defaults[FeetStateAttr] = {DefaultFeetStateAttrValue, DefaultFeetStateSuffixValue};
     }
 
-    state.values[GenderAttr] = GetSuffixData(aEntity, GenderSuffix, aEquippedItemID);
-    state.values[CameraAttr] = GetSuffixData(aEntity, CameraSuffix, aEquippedItemID);
-    state.values[BodyTypeAttr] = GetSuffixData(aEntity, BodyTypeSuffix, aEquippedItemID);
-    state.values[ArmsStateAttr] = GetSuffixData(aEntity, ArmsStateSuffix, aEquippedItemID);
-    state.values[FeetStateAttr] = GetSuffixData(aEntity, FeetStateSuffix, aEquippedItemID);
-    state.values[InnerSleevesAttr] = GetSuffixData(aEntity, InnerSleevesSuffix, aEquippedItemID);
-    state.values[HairTypeAttr] = GetSuffixData(aEntity, HairTypeSuffix, aEquippedItemID);
+    state.values[GenderAttr] = GetSuffixData(aEntity, GenderSuffix, state.equippedItemID);
+    state.values[CameraAttr] = GetSuffixData(aEntity, CameraSuffix, state.equippedItemID);
+    state.values[BodyTypeAttr] = GetSuffixData(aEntity, BodyTypeSuffix, state.equippedItemID);
+    state.values[ArmsStateAttr] = GetSuffixData(aEntity, ArmsStateSuffix, state.equippedItemID);
+    state.values[FeetStateAttr] = GetSuffixData(aEntity, FeetStateSuffix, state.equippedItemID);
+    state.values[InnerSleevesAttr] = GetSuffixData(aEntity, InnerSleevesSuffix, state.equippedItemID);
+    state.values[HairTypeAttr] = GetSuffixData(aEntity, HairTypeSuffix, state.equippedItemID);
 
     auto custimizationData = GetCustomizationData(aEntity);
     state.values[SkinColorAttr] = {custimizationData.skinColor};
     state.values[HairColorAttr] = {custimizationData.hairColor};
     state.values[EyesColorAttr] = {custimizationData.eyesColor};
+    state.values[NailsColorAttr] = {custimizationData.nailsColor};
 
     state.conditions.clear();
     for (const auto& [attributeName, attributeData] : state.values)
@@ -588,6 +643,16 @@ void App::DynamicAppearanceController::UpdateState(Red::Entity* aEntity, Red::Tw
             state.conditions.insert(condition);
         }
     }
+
+    state.equippedItemID.value = 0;
+    state.valid = true;
+}
+
+void App::DynamicAppearanceController::UpdateState(Red::Entity* aEntity, Red::TweakDBID aEquippedItemID)
+{
+    auto& state = m_states[aEntity];
+    state.equippedItemID = aEquippedItemID;
+    state.valid = false;
 }
 
 void App::DynamicAppearanceController::RemoveState(Red::Entity* aEntity)
@@ -738,10 +803,9 @@ App::DynamicAttributeData App::DynamicAppearanceController::GetSuffixData(Red::E
 App::DynamicAppearanceController::CustomizationData App::DynamicAppearanceController::GetCustomizationData(
     Red::Entity* aEntity) const
 {
-    static auto system = Red::GetGameSystem<Red::game::ui::ICharacterCustomizationSystem>();
-
     CustomizationData data{};
 
+    auto system = Red::GetGameSystem<Red::game::ui::ICharacterCustomizationSystem>();
     if (!system)
         return data;
 
@@ -762,6 +826,11 @@ App::DynamicAppearanceController::CustomizationData App::DynamicAppearanceContro
         case FemaleEyesComponent:
             data.eyesColor = ComponentWrapper(component).GetAppearanceName();
             break;
+        case MaleNailsComponent:
+        case FemaleNailsComponent1:
+        case FemaleNailsComponent2:
+            data.nailsColor = ComponentWrapper(component).GetAppearanceName();
+            break;
         }
     }
 
@@ -770,6 +839,31 @@ App::DynamicAppearanceController::CustomizationData App::DynamicAppearanceContro
 #else
     Raw::CharacterCustomizationHelper::GetHairColor(data.hairColor, system->ref, data.isMale);
 #endif
+
+    if (!data.nailsColor)
+    {
+        auto state = Raw::CharacterCustomizationSystem::State::Ref(system);
+        if (state)
+        {
+            const auto& arms = Raw::CharacterCustomizationState::ArmsGroups::Ref(state);
+            for (const auto& group : arms | std::views::reverse)
+            {
+                if (group.name == NailsGroup)
+                {
+                    for (const auto& option : group.customization | std::views::reverse)
+                    {
+                        if (option.name == NailsOption)
+                        {
+                            data.nailsColor =
+                                ExtractDynamicName(option.definition.ToString(), NailsColorPrefixLength, true);
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     return data;
 }

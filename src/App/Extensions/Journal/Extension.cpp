@@ -94,7 +94,7 @@ void App::JournalExtension::OnInitializeRoot(Red::game::JournalRootFolderEntry* 
                                              Red::JobQueue& aJobQueue)
 #else
 void App::JournalExtension::OnInitializeRoot(Red::game::JournalRootFolderEntry* aJournalRoot, uintptr_t, uintptr_t,
-                                          Red::JobQueue& aJobQueue)
+                                             Red::JobQueue& aJobQueue)
 #endif
 {
     static const auto s_rootEntryType = Red::GetClass<Red::game::JournalRootFolderEntry>();
@@ -129,7 +129,7 @@ void App::JournalExtension::OnInitializeRoot(Red::game::JournalRootFolderEntry* 
 
         LogInfo("[{}] Merging entries from \"{}\"...", ExtensionName, s_paths[resource->path]);
 
-        successAll &= MergeEntries(aJournalRoot, root);
+        successAll &= MergeEntries(aJournalRoot, root, root->id.c_str());
         mergedAny = true;
     }
 
@@ -175,29 +175,26 @@ void App::JournalExtension::OnMappinDataLoaded(void* aMappinSystem, Red::worldRu
         return;
 
     auto cookedMappinResource = Raw::MappinSystem::CookedMappinResource::Ptr(aMappinSystem)->instance;
-    if (cookedMappinResource->cookedData.size && cookedMappinResource->cookedData.size == cookedMappinResource->cookedData.capacity)
+    if (!cookedMappinResource->cookedData.IsEmpty() && cookedMappinResource->cookedData.Size() == cookedMappinResource->cookedData.Capacity())
     {
         {
             const auto reserve = std::max<std::size_t>(
-                s_mappins.size() << 1,
-                static_cast<std::size_t>(cookedMappinResource->cookedData.size) / 2);
-            cookedMappinResource->cookedData.Reserve(cookedMappinResource->cookedData.size + reserve);
+                s_mappins.size() << 1, static_cast<std::size_t>(cookedMappinResource->cookedData.Size()) / 2);
+            cookedMappinResource->cookedData.Reserve(cookedMappinResource->cookedData.Size() + reserve);
         }
         {
             const auto reserve = std::max<std::size_t>(
-                s_mappins.size() << 1,
-                static_cast<std::size_t>(cookedMappinResource->cookedMultiData.size) / 2);
-            cookedMappinResource->cookedMultiData.Reserve(cookedMappinResource->cookedMultiData.size + reserve);
+                s_mappins.size() << 1, static_cast<std::size_t>(cookedMappinResource->cookedMultiData.Size()) / 2);
+            cookedMappinResource->cookedMultiData.Reserve(cookedMappinResource->cookedMultiData.Size() + reserve);
         }
     }
 
     auto cookedPoiResource = Raw::MappinSystem::CookedPoiResource::Ptr(aMappinSystem)->instance;
-    if (cookedPoiResource->cookedData.size && cookedPoiResource->cookedData.size == cookedPoiResource->cookedData.capacity)
+    if (!cookedPoiResource->cookedData.IsEmpty() && cookedPoiResource->cookedData.Size() == cookedPoiResource->cookedData.Capacity())
     {
-        const auto reserve = std::max<std::size_t>(
-            s_mappins.size() << 1,
-            static_cast<std::size_t>(cookedPoiResource->cookedData.size) / 2);
-        cookedPoiResource->cookedData.Reserve(cookedPoiResource->cookedData.size + reserve);
+        const auto reserve = std::max<std::size_t>(s_mappins.size() << 1,
+                                                   static_cast<std::size_t>(cookedPoiResource->cookedData.Size()) / 2);
+        cookedPoiResource->cookedData.Reserve(cookedPoiResource->cookedData.Size() + reserve);
     }
 }
 
@@ -263,7 +260,7 @@ void App::JournalExtension::ResolveCookedMappin(void* aMappinSystem, uint32_t aH
             auto resource = GetCookedPoiResource(aMappinSystem);
             resource->cookedData.PushBack(std::move(cookedMappin));
 
-            aCookedMappin = resource->cookedData.End() - 1;
+            aCookedMappin = &resource->cookedData.Back();
         }
     }
     else
@@ -272,7 +269,7 @@ void App::JournalExtension::ResolveCookedMappin(void* aMappinSystem, uint32_t aH
 
         if (ResolveMappinPosition(aHash, aJournalMappin, cookedMappin.position))
         {
-            ResolveMappinVolune(aHash, aJournalMappin, cookedMappin.volume);
+            ResolveMappinVolume(aHash, aJournalMappin, cookedMappin.volume);
 
             cookedMappin.journalPathHash = aHash;
 
@@ -280,7 +277,7 @@ void App::JournalExtension::ResolveCookedMappin(void* aMappinSystem, uint32_t aH
             auto resource = GetCookedMappinResource(aMappinSystem);
             resource->cookedData.PushBack(std::move(cookedMappin));
 
-            aCookedMappin = resource->cookedData.End() - 1;
+            aCookedMappin = &resource->cookedData.Back();
         }
     }
 }
@@ -296,20 +293,20 @@ void App::JournalExtension::ResolveMappinReference(JournalMappin& aMappin)
 
 bool App::JournalExtension::ResolveMappinPosition(uint32_t aHash, const JournalMappin& aMappin, Red::Vector3& aResult)
 {
-    LogInfo("[{}] Cooked mappin #{} requested...", ExtensionName, aHash);
+    LogInfo("[{}] Cooked mappin #{} ({}) requested...", ExtensionName, aHash, aMappin.path);
 
     if (!aMappin.reference.hash)
     {
         aResult = aMappin.offset;
 
-        LogInfo("[{}] Cooked mappin #{} resolved to static offset.", ExtensionName, aHash);
+        LogInfo("[{}] Cooked mappin #{} ({}) resolved to static offset.", ExtensionName, aHash, aMappin.path);
 
         return true;
     }
 
     if (!aMappin.resolved.hash)
     {
-        LogError("[{}] Can't resolve mappin #{} reference.", ExtensionName, aHash);
+        LogError("[{}] Can't resolve mappin #{} ({}) reference.", ExtensionName, aHash, aMappin.path);
         return false;
     }
 
@@ -320,20 +317,21 @@ bool App::JournalExtension::ResolveMappinPosition(uint32_t aHash, const JournalM
 
     if (!success)
     {
-        LogError("[{}] Can't resolve mappin #{} position.", ExtensionName, aHash);
+        LogError("[{}] Can't resolve mappin #{} ({}) position.", ExtensionName, aHash, aMappin.path);
         return false;
     }
 
-    aResult.X = transform.position.X;
-    aResult.Y = transform.position.Y;
-    aResult.Z = transform.position.Z;
+    aResult.X = transform.position.X + aMappin.offset.X;
+    aResult.Y = transform.position.Y + aMappin.offset.Y;
+    aResult.Z = transform.position.Z + aMappin.offset.Z;
 
-    LogInfo("[{}] Cooked mappin #{} resolved to NodeRef #{}.",  ExtensionName, aHash, aMappin.resolved.hash);
+    LogInfo("[{}] Cooked mappin #{} ({}) resolved to NodeRef #{}.",
+            ExtensionName, aHash, aMappin.path, aMappin.resolved.hash);
 
     return true;
 }
 
-bool App::JournalExtension::ResolveMappinVolune(uint32_t aJournalHash,
+bool App::JournalExtension::ResolveMappinVolume(uint32_t aJournalHash,
                                                 const App::JournalExtension::JournalMappin& aMappin,
                                                 Red::Handle<Red::gamemappinsIMappinVolume>& aResult)
 {
@@ -365,7 +363,7 @@ bool App::JournalExtension::ResolveMappinVolune(uint32_t aJournalHash,
 
     const auto volume = Red::MakeHandle<Red::gamemappinsOutlineMappinVolume>();
     volume->height = areaNode->outline->height  * scale.Z;
-    volume->outlinePoints.Reserve(areaNode->outline->points.size);
+    volume->outlinePoints.Reserve(areaNode->outline->points.Size());
 
     for (const auto& areaPoint : areaNode->outline->points)
     {
@@ -430,8 +428,8 @@ App::JournalExtension::EntrySearchResult App::JournalExtension::FindEntry(Red::g
 }
 
 bool App::JournalExtension::MergeEntries(Red::game::JournalContainerEntry* aTarget,
-                                      Red::game::JournalContainerEntry* aSource,
-                                      const std::string& aPath)
+                                         Red::game::JournalContainerEntry* aSource,
+                                         const std::string& aPath)
 {
     auto success = true;
 
@@ -468,7 +466,7 @@ bool App::JournalExtension::MergeEntries(Red::game::JournalContainerEntry* aTarg
 }
 
 bool App::JournalExtension::MergeEntry(Red::game::JournalEntry* aTarget, Red::game::JournalEntry* aSource,
-                                    const std::string& aPath, bool aEditProps)
+                                       const std::string& aPath, bool aEditProps)
 {
     static const auto s_containerEntryType = Red::GetClass<Red::game::JournalContainerEntry>();
 
@@ -561,7 +559,7 @@ void App::JournalExtension::CollectMappin(Red::game::JournalEntry* aEntry, const
 
         if (!entry->reference.dynamicEntityUniqueName)
         {
-            s_mappins.insert({hash, {entry->reference.reference, entry->offset, false}});
+            s_mappins.insert({hash, {aPath, entry->reference.reference, entry->offset, false}});
 
             if (!entry->reference.reference.hash)
             {
@@ -574,14 +572,14 @@ void App::JournalExtension::CollectMappin(Red::game::JournalEntry* aEntry, const
         auto hash = CalculateJournalHash(aPath);
         auto entry = reinterpret_cast<Red::gameJournalQuestMapPinBase*>(aEntry);
 
-        s_mappins.insert({hash, {0ull, entry->offset, false}});
+        s_mappins.insert({hash, {aPath, 0ull, entry->offset, false}});
     }
     else if (entryType->IsA(s_pointOfInterestType))
     {
         auto hash = CalculateJournalHash(aPath);
         auto entry = reinterpret_cast<Red::gameJournalPointOfInterestMappin*>(aEntry);
 
-        s_mappins.insert({hash, {entry->staticNodeRef, entry->offset, true}});
+        s_mappins.insert({hash, {aPath, entry->staticNodeRef, entry->offset, true}});
 
         if (!entry->staticNodeRef.hash)
         {

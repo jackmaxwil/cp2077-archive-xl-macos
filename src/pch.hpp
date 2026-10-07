@@ -22,7 +22,7 @@
 #include <RED4ext/RED4ext.hpp>
 
 #include <RED4ext/JobQueue.hpp>
-#include <RED4ext/RenderProxy.hpp>
+#include <RED4ext/Rendering/RenderProxy.hpp>
 #include <RED4ext/ResourceDepot.hpp>
 #include <RED4ext/ResourceLoader.hpp>
 #include <RED4ext/Scripting/Natives/Generated/AI/SpotPersistentData.hpp>
@@ -31,6 +31,7 @@
 #include <RED4ext/Scripting/Natives/Generated/CMaterialInstance.hpp>
 #include <RED4ext/Scripting/Natives/Generated/CMesh.hpp>
 #include <RED4ext/Scripting/Natives/Generated/CurveSet.hpp>
+#include <RED4ext/Scripting/Natives/Generated/IAreaSettings.hpp>
 #include <RED4ext/Scripting/Natives/Generated/IRenderResourceBlob.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ITexture.hpp>
 #include <RED4ext/Scripting/Natives/Generated/JsonResource.hpp>
@@ -119,12 +120,19 @@
 #include <RED4ext/Scripting/Natives/Generated/ink/anim/Sequence.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ink/WidgetLibraryResource.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ink/WidgetLogicController.hpp>
+#include <RED4ext/Scripting/Natives/Generated/ink/anim/AnimationLibraryResource.hpp>
+#include <RED4ext/Scripting/Natives/Generated/ink/anim/Definition.hpp>
+#include <RED4ext/Scripting/Natives/Generated/ink/anim/Event.hpp>
+#include <RED4ext/Scripting/Natives/Generated/ink/anim/Interpolator.hpp>
+#include <RED4ext/Scripting/Natives/Generated/ink/anim/Sequence.hpp>
+#include <RED4ext/Scripting/Natives/Generated/ink/anim/SequenceTargetInfo.hpp>
 #include <RED4ext/Scripting/Natives/Generated/loc/VoLanguageDataMap.hpp>
 #include <RED4ext/Scripting/Natives/Generated/localization/PersistenceOnScreenEntries.hpp>
 #include <RED4ext/Scripting/Natives/Generated/localization/PersistenceSubtitleMap.hpp>
 #include <RED4ext/Scripting/Natives/Generated/mesh/MeshAppearance.hpp>
 #include <RED4ext/Scripting/Natives/Generated/mesh/MeshParameter.hpp>
 #include <RED4ext/Scripting/Natives/Generated/net/PeerID.hpp>
+#include <RED4ext/Scripting/Natives/Generated/physics/GeometryKey.hpp>
 #include <RED4ext/Scripting/Natives/Generated/population/PopulationSpawnParameter.hpp>
 #include <RED4ext/Scripting/Natives/Generated/quest/GraphDefinition.hpp>
 #include <RED4ext/Scripting/Natives/Generated/quest/PhaseNodeDefinition.hpp>
@@ -145,6 +153,8 @@
 #include <RED4ext/Scripting/Natives/Generated/world/CollisionNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/EffectNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/EntityNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/EnvironmentAreaParameters.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/EnvironmentDefinition.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/FoliageNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/GlobalNodeID.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/INodeInstance.hpp>
@@ -167,6 +177,8 @@
 #include <RED4ext/Scripting/Natives/Generated/world/StreamingSector.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/StreamingWorld.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/TerrainMeshNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/WeatherState.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/WeatherStateTransition.hpp>
 #include <RED4ext/Scripting/Natives/ScriptGameInstance.hpp>
 #include <RED4ext/StringView.hpp>
 

@@ -32,9 +32,9 @@ namespace Raw::AppearanceResource
 {
 using Mutex = Core::OffsetPtr<0xF0, Red::SharedSpinLock>;
 
-constexpr auto OnLoad = Core::RawFunc<
-    /* addr = */ Red::AddressLib::AppearanceResource_OnLoad,
-    /* type = */ void (*)(Red::AppearanceResource* aResource)>();
+constexpr auto PostLoad = Core::RawFunc<
+    /* addr = */ Red::AddressLib::AppearanceResource_PostLoad,
+    /* type = */ void (*)(Red::AppearanceResource* aResource, Red::PostLoadParams* a2)>();
 
 #ifdef __APPLE__
 // macOS: Handle<AppearanceDefinition>(x8 out; resource x0, CName x1, u32 w2, u8 w3).

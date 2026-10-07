@@ -47,7 +47,7 @@ void App::AnimationsConfig::LoadYAML(const YAML::Node& aNode)
         {
             entry.entities.insert(entityNode.Scalar());
         }
-        else if (entityNode.IsScalar())
+        else if (entityNode.IsSequence())
         {
             for (const auto& pathNode : entityNode)
             {
@@ -79,7 +79,7 @@ void App::AnimationsConfig::LoadYAML(const YAML::Node& aNode)
         {
             for (const auto& variableNode : variablesNode)
             {
-                if (variablesNode.IsScalar())
+                if (variableNode.IsScalar())
                 {
                     entry.variables.push_back(variableNode.Scalar());
                 }

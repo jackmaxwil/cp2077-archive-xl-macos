@@ -14,18 +14,17 @@ public:
     bool Unload() override;
     std::string_view GetName() override;
 
+    static bool IsDynamicMesh(Red::CMesh* aMesh);
     static bool IsContextualMesh(Red::CMesh* aMesh);
-    static bool IsSpecialMaterial(Red::CName aMaterialName);
-    static void PrefetchMeshState(Red::CMesh* aMesh, const Core::Map<Red::CName, std::string>& aContext);
-    static Red::CName RegisterMeshSource(Red::CMesh* aMesh, Red::CMesh* aSourceMesh);
+    static bool IsTemplateMaterial(Red::CName aMaterialName);
+    static bool IsDynamicMaterial(Red::CName aMaterialName);
+    static void PrepareMeshState(Red::CMesh* aMesh, const Core::Map<Red::CName, std::string>& aContext);
+    static Red::CName RegisterMeshPatch(Red::CMesh* aMesh, Red::CMesh* aSourceMesh);
 
 private:
     struct MeshState
     {
         MeshState(Red::CMesh* aMesh);
-
-        void MarkStatic();
-        [[nodiscard]] bool IsStatic() const;
 
         void PrefetchContext(Red::CMesh* aMesh);
         void PrefillContext(const Core::Map<Red::CName, std::string>& aContext);
@@ -40,15 +39,14 @@ private:
 
         void FillAppearances(Red::CMesh* aMesh);
         void FillMaterials(Red::CMesh* aMesh);
-        void RegisterMaterialEntry(Red::CName aMaterialName, int32_t aEntryIndex);
+        void AddMaterialEntry(Red::CName aMaterialName, int32_t aMaterialIndex);
+        [[nodiscard]] bool HasMaterialEntry(Red::CName aMaterialName) const;
         [[nodiscard]] int32_t GetTemplateEntryIndex(Red::CName aMaterialName);
         [[nodiscard]] int32_t GetMaterialEntryIndex(Red::CName aMaterialName);
-        [[nodiscard]] bool HasMaterialEntry(Red::CName aMaterialName) const;
 
         Red::CName RegisterSource(Red::CMesh* aSourceMesh);
         [[nodiscard]] Red::Handle<Red::CMesh> ResolveSource(Red::CName aSourceName);
 
-        volatile bool dynamic;
         Red::ResourcePath meshPath;
         Red::SharedSpinLock meshMutex;
         Red::SharedSpinLock sourceMutex;
@@ -65,12 +63,15 @@ private:
 
     struct ChunkData
     {
+        const DynamicPartList& GetMaterialAttrs();
+
         Red::CName chunkName{};
         Red::CName materialName{};
         Red::CName templateName{};
         int32_t sourceIndex{-1};
         Red::SharedPtr<Red::ResourceToken<Red::IMaterial>> sourceToken{};
         Red::Handle<Red::CMaterialInstance> sourceInstance{};
+        DynamicPartList materialAttrs;
         bool failed{false};
     };
 
@@ -99,6 +100,8 @@ private:
     static void OnAddStubAppearance(Red::CMesh* aMesh);
     static bool OnPreloadAppearances(Red::CMesh* aMesh);
 
+    static void ProcessAppearance(Red::CMesh* aMesh, const Core::SharedPtr<MeshState>& aMeshState,
+                                  const Red::Handle<Red::meshMeshAppearance>& aAppearance);
     static void ProcessDynamicMaterials(const Core::SharedPtr<DynamicContext>& aContext,
                                         const Red::JobGroup& aJobGroup);
     static void FinalizeDynamicMaterial(const Core::SharedPtr<DynamicContext>& aContext,
@@ -116,12 +119,14 @@ private:
                                              const Core::SharedPtr<ChunkData>& aChunk,
                                              const Red::Handle<Red::CMaterialInstance>& aMaterialInstance,
                                              Red::JobQueue& aJobQueue);
-    static std::pair<Red::ResourcePath, bool> ExpandResourcePath(Red::ResourcePath aPath, Red::CName aMaterialName,
+    static std::pair<Red::ResourcePath, bool> ExpandResourcePath(Red::ResourcePath aPath,
+                                                                 const Core::SharedPtr<ChunkData>& aChunk,
                                                                  const Core::SharedPtr<MeshState>& aState);
     static bool ContainsUnresolvedMaterials(const Red::DynArray<Red::Handle<Red::IMaterial>>& aMaterials);
 
     static Core::SharedPtr<MeshState> AcquireMeshState(Red::CMesh* aMesh);
-    static Core::SharedPtr<MeshState> FindMeshState(uint64_t aHash);
+    static Core::SharedPtr<MeshState> FindMeshState(Red::CMesh* aMesh);
+    static bool HasMeshState(Red::CMesh* aMesh);
 
     inline static Core::Map<Red::ResourcePath, Core::SharedPtr<MeshState>> s_states;
     inline static Red::Handle<Red::CMesh> s_dummyMesh;

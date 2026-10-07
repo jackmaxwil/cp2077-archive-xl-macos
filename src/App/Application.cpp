@@ -45,9 +45,9 @@ static_assert(ReturnedInRegisters<Red::CName> && sizeof(Red::CName) == 8);
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
-App::Application::Application(HMODULE aHandle, const RED4ext::Sdk* aSdk)
+App::Application::Application(HMODULE aHandle, const RED4ext::v1::Sdk* aSdk)
 #else
-App::Application::Application(void* aHandle, const RED4ext::Sdk* aSdk)
+App::Application::Application(void* aHandle, const RED4ext::v1::Sdk* aSdk)
 #endif
 {
     // Game root from the executable: bin/x64/Cyberpunk2077.exe on Windows,
@@ -61,7 +61,8 @@ App::Application::Application(void* aHandle, const RED4ext::Sdk* aSdk)
 
     Register<Support::SpdlogProvider>()
         ->AppendTimestampToLogName()
-        ->CreateRecentLogSymlink();
+        ->CreateRecentLogSymlink()
+        ->SetMaxLogFiles(5);
 
 #if defined(_WIN32) || defined(_WIN64)
     Register<Support::MinHookProvider>();

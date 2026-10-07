@@ -122,7 +122,7 @@ void App::ArchiveService::OnInitializeArchives(Red::ResourceDepot* aDepot)
 
         auto& group = ResolveArchiveGroup(aDepot, archiveDir.string());
 
-        if (archivePaths.size > 0)
+        if (!archivePaths.IsEmpty())
         {
             LoadArchives(group, archivePaths, loadedResources);
         }

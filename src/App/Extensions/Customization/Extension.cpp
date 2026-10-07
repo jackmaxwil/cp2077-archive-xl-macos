@@ -549,7 +549,7 @@ void App::CustomizationExtension::MergeCustomOptions(Red::DynArray<Customization
 
                 if (isWildcardSlot || isWildcardLink)
                 {
-                    if (!targetAppOption->resource.path || !targetAppOption->definitions.size)
+                    if (!targetAppOption->resource.path || targetAppOption->definitions.IsEmpty())
                         continue;
                 }
 
@@ -672,7 +672,7 @@ void App::CustomizationExtension::ExpandCustomizationOptions(Red::DynArray<Custo
                 continue;
             }
 
-            if (currentAppOption->definitions.size > 0)
+            if (!currentAppOption->definitions.IsEmpty())
             {
                 nonEmptyAppOption = currentAppOption;
                 continue;
@@ -701,7 +701,7 @@ void App::CustomizationExtension::RegenerateIndexes(Red::DynArray<CustomizationO
         {
             auto& targetAppOption = reinterpret_cast<CustomizationAppearance&>(targetOption);
 
-            for (int32_t index = 0; index < targetAppOption->definitions.size; ++index)
+            for (int32_t index = 0; index < targetAppOption->definitions.Size(); ++index)
             {
                 targetAppOption->definitions[index].index = index;
             }
@@ -710,7 +710,7 @@ void App::CustomizationExtension::RegenerateIndexes(Red::DynArray<CustomizationO
         {
             auto& targetMorphOption = reinterpret_cast<CustomizationMorph&>(targetOption);
 
-            for (int32_t index = 0; index < targetMorphOption->morphNames.size; ++index)
+            for (int32_t index = 0; index < targetMorphOption->morphNames.Size(); ++index)
             {
                 targetMorphOption->morphNames[index].index = index;
             }
@@ -719,7 +719,7 @@ void App::CustomizationExtension::RegenerateIndexes(Red::DynArray<CustomizationO
         {
             auto& targetSwitcherOption = reinterpret_cast<CustomizationSwitcher&>(targetOption);
 
-            for (int32_t index = 0; index < targetSwitcherOption->options.size; ++index)
+            for (int32_t index = 0; index < targetSwitcherOption->options.Size(); ++index)
             {
                 targetSwitcherOption->options[index].index = index;
             }
@@ -767,7 +767,7 @@ void App::CustomizationExtension::RemoveCustomGroups(Red::DynArray<Customization
 {
     for (auto& targetGroup : aTargetGroups)
     {
-        for (auto i = static_cast<int32_t>(targetGroup.options.size) - 1; i >= 0; --i)
+        for (auto i = static_cast<int32_t>(targetGroup.options.Size()) - 1; i >= 0; --i)
         {
             if (IsCustomEntryName(targetGroup.options[i]))
             {
@@ -779,7 +779,7 @@ void App::CustomizationExtension::RemoveCustomGroups(Red::DynArray<Customization
 
 void App::CustomizationExtension::RemoveCustomOptions(Red::DynArray<CustomizationOption>& aTargetOptions)
 {
-    for (auto i = static_cast<int32_t>(aTargetOptions.size) - 1; i >= 0; --i)
+    for (auto i = static_cast<int32_t>(aTargetOptions.Size()) - 1; i >= 0; --i)
     {
         auto& targetOption = aTargetOptions[i];
 
@@ -793,7 +793,7 @@ void App::CustomizationExtension::RemoveCustomOptions(Red::DynArray<Customizatio
         {
             auto& targetAppOption = reinterpret_cast<CustomizationAppearance&>(targetOption);
 
-            for (auto j = static_cast<int32_t>(targetAppOption->definitions.size) - 1; j >= 0; --j)
+            for (auto j = static_cast<int32_t>(targetAppOption->definitions.Size()) - 1; j >= 0; --j)
             {
                 if (IsCustomEntryName(targetAppOption->definitions[j].name))
                 {
@@ -805,7 +805,7 @@ void App::CustomizationExtension::RemoveCustomOptions(Red::DynArray<Customizatio
         {
             auto& targetMorphOption = reinterpret_cast<CustomizationMorph&>(targetOption);
 
-            for (auto j = static_cast<int32_t>(targetMorphOption->morphNames.size) - 1; j >= 0; --j)
+            for (auto j = static_cast<int32_t>(targetMorphOption->morphNames.Size()) - 1; j >= 0; --j)
             {
                 if (IsCustomEntryName(targetMorphOption->name, targetMorphOption->morphNames[j].localizedName))
                 {
@@ -817,7 +817,7 @@ void App::CustomizationExtension::RemoveCustomOptions(Red::DynArray<Customizatio
         {
             auto& targetSwitcherOption = reinterpret_cast<CustomizationSwitcher&>(targetOption);
 
-            for (auto j = static_cast<int32_t>(targetSwitcherOption->options.size) - 1; j >= 0; --j)
+            for (auto j = static_cast<int32_t>(targetSwitcherOption->options.Size()) - 1; j >= 0; --j)
             {
                 if (IsCustomEntryName(targetSwitcherOption->name, targetSwitcherOption->options[j].localizedName))
                 {
@@ -873,7 +873,7 @@ void App::CustomizationExtension::FixCustomizationAppearance(Red::AppearanceReso
                                                              Red::Handle<Red::AppearanceDefinition>* aDefinition,
                                                              Red::CName aAppearanceName)
 {
-    if (aResource->appearances.size == 0)
+    if (aResource->appearances.IsEmpty())
         return;
 
     if (!ResourceMetaExtension::InScope(ResourceMetaExtension::CustomizationApp, aResource->path))
@@ -891,7 +891,7 @@ void App::CustomizationExtension::FixCustomizationAppearance(Red::AppearanceReso
     {
         meshAppearanceStr.remove_prefix(3);
 
-        auto sourceIndex = aResource->appearances.size > 1 ? 1 : 0;
+        auto sourceIndex = aResource->appearances.Size() > 1 ? 1 : 0;
         sourceDefinition = aResource->appearances[sourceIndex];
     }
     else
@@ -899,13 +899,13 @@ void App::CustomizationExtension::FixCustomizationAppearance(Red::AppearanceReso
         auto delimiterPos = meshAppearanceStr.rfind("__");
         if (delimiterPos != std::string_view::npos)
         {
-            if (aResource->appearances.size == 1)
+            if (aResource->appearances.Size() == 1)
             {
                 sourceDefinition = aResource->appearances[0];
             }
             else
             {
-                for (auto sourceIndex = 0; sourceIndex < aResource->appearances.size; ++sourceIndex)
+                for (auto sourceIndex = 0; sourceIndex < aResource->appearances.Size(); ++sourceIndex)
                 {
                     auto sourceNameStr = std::string_view{aResource->appearances[sourceIndex]->name.ToString()};
                     if (sourceNameStr.compare(0, delimiterPos, meshAppearanceStr, 0, delimiterPos) == 0)
@@ -929,12 +929,12 @@ void App::CustomizationExtension::FixCustomizationAppearance(Red::AppearanceReso
 
         if (!sourceDefinition)
         {
-            auto sourceIndex = aResource->appearances.size > 1 ? 1 : 0;
+            auto sourceIndex = aResource->appearances.Size() > 1 ? 1 : 0;
             sourceDefinition = aResource->appearances[sourceIndex];
         }
     }
 
-    if (sourceDefinition->partsOverrides.size > 0)
+    if (!sourceDefinition->partsOverrides.IsEmpty())
     {
         if (IsFixedCustomizationAppearance(sourceDefinition))
         {
@@ -1016,7 +1016,7 @@ void App::CustomizationExtension::FixCustomizationComponents(const Red::Handle<R
 
 bool App::CustomizationExtension::IsFixedCustomizationAppearance(const Red::Handle<Red::AppearanceDefinition>& aDefinition)
 {
-    return aDefinition->partsOverrides.size == 1 &&
-           aDefinition->partsOverrides[0].componentsOverrides.size == 1 &&
+    return aDefinition->partsOverrides.Size() == 1 &&
+           aDefinition->partsOverrides[0].componentsOverrides.Size() == 1 &&
            !aDefinition->partsOverrides[0].componentsOverrides[0].componentName;
 }
