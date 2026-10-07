@@ -15,7 +15,7 @@ It installs to `red4ext/plugins/ArchiveXL/` in the game folder:
 ```
 red4ext/plugins/ArchiveXL/
   ArchiveXL.dylib
-  Bundle/     ArchiveXL's own .xl files (and .archive files, when included)
+  Bundle/     ArchiveXL's own .xl files and ArchiveXL.archive
   Scripts/    ArchiveXL's REDscript sources
 ```
 
@@ -33,8 +33,6 @@ The `.xl` format is the same as on Windows; see the [upstream project](https://g
 
 ## Known gaps on macOS
 
-- The packed `ArchiveXL.archive` (built with WolvenKit) is not included yet. Its built-in character-customization
-  fixes log "not ready", "points to a non-existent resource" and "doesn't exist" errors. These errors are expected.
 - Hot reload (`ArchiveXL.Reload()`) is disabled. It logs `ArchiveXL.Reload() is not supported on macOS.`
   Restart the game to pick up changed `.xl` files.
 - At unload, static game handles are leaked on purpose (`LeakAtExit` in
@@ -71,7 +69,9 @@ cmake -S . -B build-dev -DCMAKE_BUILD_TYPE=Release
 cmake --build build-dev -j8
 ```
 
-Output: `build-dev/ArchiveXL.dylib`. If `../RED4ext.SDK` exists (the workspace layout used for the port), its headers
+Output: `build-dev/ArchiveXL.dylib`. `tools/fetch-bundle-archive.sh` puts ArchiveXL's packed resources
+(`ArchiveXL.archive`, built on Windows with WolvenKit) into `bundle/packed/`, taken from upstream's release for the same
+version and checked against a pinned checksum; the release and install tools do this for you. If `../RED4ext.SDK` exists (the workspace layout used for the port), its headers
 are used; otherwise the `vendor/RED4ext.SDK` submodule is. To build and install ArchiveXL together with RED4ext, use
 RED4ext's `tools/cp-dev` or `scripts/create_release.sh`. The upstream `xmake.lua` is kept for Windows builds.
 
