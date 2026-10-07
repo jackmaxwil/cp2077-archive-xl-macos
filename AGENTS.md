@@ -6,7 +6,7 @@ ArchiveXL is a Cyberpunk 2077 mod (psiberx) that enables loading and extending r
 
 ## Current Status (Canonical)
 
-See `docs/STATUS.md` for the current port snapshot. For the address-discovery deep dive, see `docs/MACOS_ADDRESS_DISCOVERY.md`.
+See `docs/STATUS.md`. ArchiveXL is not loadable yet: RED4ext refuses it until every address hash it needs is verified. The authoritative progress table is §0 of `~/Development/cyberpunk/RESUME_PLAN.md`. For the address-discovery deep dive, see `docs/MACOS_ADDRESS_DISCOVERY.md`.
 
 ## Development Practices
 
@@ -18,21 +18,22 @@ See `docs/STATUS.md` for the current port snapshot. For the address-discovery de
 
 ### Hooking & Runtime
 
-1. **Frida-based hooking.** Hook attachment is performed via the macOS provider (Frida Gadget) instead of Detours/MinHook.
+1. **Native hooking.** Hook attachment goes through the macOS provider (`MacOSHookingProvider`) to RED4ext's native hook engine instead of Detours/MinHook.
 2. **Fail loudly on required hooks.** Keep `.OrThrow()` on required hooks so missing addresses surface immediately.
 3. **No exceptions in hooks.** Hook callbacks must not throw; handle/log failures internally.
 
 ## Address Resolution (Critical)
 
-ArchiveXL has **130 custom hash IDs** (distinct from RED4ext.SDK hashes). On macOS we must provide a complete mapping:
+ArchiveXL has **130 custom hash IDs** (distinct from RED4ext.SDK hashes). Their offsets live in the SDK's canonical `cyberpunk2077_addresses.json`; only entries marked verified resolve.
 
 - **Hash list**: `src/Red/Addresses/Library.hpp`
-- **Resolver table target**: `lib/Support/macOS/ArchiveXLAddressResolver.cpp`
+- **Resolver**: `lib/Support/macOS/ArchiveXLAddressResolver.cpp` (forwards to the SDK resolver)
+- **Remaining work**: `RED4ext.SDK/scripts/plugin_requirements.py ArchiveXL.dylib` lists every unverified hash
 - **Discovery tool**: `tools/macos_discover_archivexl_offsets.py`
 
 ### Working rule
 
-- A port is not “functionally ready” until **all 130** resolve to non-zero and hooks attach without NULL/0 addresses.
+- RED4ext loads ArchiveXL only once every hash it needs is verified, with evidence in `RED4ext.SDK/docs/ADDRESS_AUDIT.md`.
 
 ### Common pitfalls
 

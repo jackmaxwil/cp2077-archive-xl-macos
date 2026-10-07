@@ -2,11 +2,11 @@
 
 Custom archive and resource loading for Cyberpunk 2077 on macOS ARM64.
 
-**Status:** Build validated — 130/130 addresses resolved, 6 hooks registered, all services enabled.
+**Status:** Not loadable yet. Most of the game addresses ArchiveXL needs are still unverified, so RED4ext refuses to load it. See [docs/STATUS.md](docs/STATUS.md).
 
 ## What it does
 
-ArchiveXL enables loading custom resources (archives, factories, localization, garments, animations, world streaming) without overwriting base game files. Built as a RED4ext `.dylib` plugin with 130 custom address mappings.
+ArchiveXL enables loading custom resources (archives, factories, localization, garments, animations, world streaming) without overwriting base game files. Built as a RED4ext `.dylib` plugin; its address hashes resolve through the SDK's canonical, verified-only address DB.
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ ARCHIVEXL_ADDR_TRACE=1 ARCHIVEXL_HOOK_TRACE=1 ./launch_red4ext.sh
 
 | File | Purpose |
 |------|---------|
-| `lib/Support/macOS/ArchiveXLAddressResolver.cpp` | 130 address mappings |
+| `lib/Support/macOS/ArchiveXLAddressResolver.cpp` | Forwards hashes to the SDK's verified-only resolver |
 | `src/Red/Addresses/Library.hpp` | Hash constant definitions |
 | `tools/macos_discover_archivexl_offsets.py` | Address discovery tool |
 | `docs/STATUS.md` | Port status |

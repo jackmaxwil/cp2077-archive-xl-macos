@@ -8,7 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(APPLE)
     message(STATUS "Building ArchiveXL for macOS")
     add_compile_definitions(RED4EXT_PLATFORM_MACOS)
-    add_compile_definitions(RED4EXT_USE_FRIDA_GADGET)
     set(CMAKE_OSX_ARCHITECTURES "arm64")
     set(OUTPUT_NAME "ArchiveXL")
 
