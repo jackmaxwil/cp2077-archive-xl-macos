@@ -128,7 +128,7 @@ bool HasStateOption(Raw::CharacterCustomizationSystem::StateOptions& aOptions, R
 // initializers (they only test whether the key exists).
 void AddStateOption(Raw::CharacterCustomizationSystem::StateOptions& aOptions, Red::CName aName)
 {
-    if (aOptions.keys.size != aOptions.values.size)
+    if (aOptions.keys.Size() != aOptions.values.Size())
         return;
 
     if (aOptions.flags & static_cast<int32_t>(Raw::CharacterCustomizationSystem::StateOptions::Flags::NotSorted))

@@ -70,7 +70,8 @@ bool App::ResourcePatchExtension::Load()
 bool App::ResourcePatchExtension::Unload()
 {
     LeakAtExit(s_patches);
-    LeakAtExit(s_patchTokens);
+    LeakAtExit(s_targetPatches);
+    LeakAtExit(s_dynamicPatches);
 
     Unhook<Raw::ResourceSerializer::Load>();
     Unhook<Raw::ResourceSerializer::Deserialize>();
@@ -867,16 +868,14 @@ void App::ResourcePatchExtension::OnGarmentPackageExtract(Red::GarmentExtraction
     if (patchList.empty())
         return;
 
-    for (const auto& patchPath : patchList)
+    for (const auto& patchInstance : patchList)
     {
-        if (!GetPatchResource<Red::EntityTemplate>(patchPath))
+        if (!patchInstance->GetResource<Red::EntityTemplate>())
             continue;
 
-        const auto& patchConfig = GetPatchConfig(patchPath);
-
-        if (patchConfig->Modifies(EntityTemplateComponentsProp))
+        if (patchInstance->Modifies(EntityTemplateComponentsProp))
         {
-            auto patchToken = GetPatchToken<Red::EntityTemplate>(patchPath);
+            auto patchToken = patchInstance->GetToken<Red::EntityTemplate>();
             if (!patchToken)
                 continue;
 

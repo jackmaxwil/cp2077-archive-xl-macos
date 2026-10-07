@@ -34,8 +34,8 @@ void App::ExtensionLoader::Configure()
                 for (const auto& group : depot->groups)
                 {
                     LogInfo("[Depot] group scope={} basePath=\"{}\" archives={} first=\"{}\"",
-                            static_cast<uint32_t>(group.scope), group.basePath.c_str(), group.archives.size,
-                            group.archives.size > 0 ? group.archives[0].path.c_str() : "");
+                            static_cast<uint32_t>(group.scope), group.basePath.c_str(), group.archives.Size(),
+                            !group.archives.IsEmpty() ? group.archives[0].path.c_str() : "");
                 }
             }
 
