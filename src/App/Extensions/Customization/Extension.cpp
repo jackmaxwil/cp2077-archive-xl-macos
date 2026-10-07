@@ -5,6 +5,10 @@
 #include "Red/Buffer.hpp"
 #include "Red/TweakDB.hpp"
 
+// RedLib derives the RTTI name of an SDK enum from its C++ spelling; guard the clang spelling (see Resolving.hpp).
+static_assert(std::string_view(Red::GetTypeNameStr<Red::game::ui::CharacterCustomizationPart>().data()) ==
+              "gameuiCharacterCustomizationPart");
+
 namespace
 {
 constexpr auto ExtensionName = "CharacterCustomization";
@@ -25,7 +29,9 @@ bool App::CustomizationExtension::Load()
 {
     HookBefore<Raw::CharacterCustomizationSystem::Initialize>(&CustomizationExtension::OnActivateSystem).OrThrow();
     HookBefore<Raw::CharacterCustomizationSystem::Uninitialize>(&CustomizationExtension::OnDeactivateSystem).OrThrow();
+#ifndef __APPLE__
     HookBefore<Raw::CharacterCustomizationSystem::GetResource>(&CustomizationExtension::OnPrepareResource).OrThrow();
+#endif
     HookBefore<Raw::CharacterCustomizationSystem::InitializeAppOption>(&CustomizationExtension::OnInitAppOption).OrThrow();
     HookBefore<Raw::CharacterCustomizationSystem::InitializeMorphOption>(&CustomizationExtension::OnInitMorphOption).OrThrow();
     HookAfter<Raw::CharacterCustomizationSystem::InitializeSwitcherOption>(&CustomizationExtension::OnInitSwitcherOption).OrThrow();
@@ -50,7 +56,9 @@ bool App::CustomizationExtension::Unload()
 {
     Unhook<Raw::CharacterCustomizationSystem::Initialize>();
     Unhook<Raw::CharacterCustomizationSystem::Uninitialize>();
+#ifndef __APPLE__
     Unhook<Raw::CharacterCustomizationSystem::GetResource>();
+#endif
     Unhook<Raw::CharacterCustomizationSystem::InitializeAppOption>();
     Unhook<Raw::CharacterCustomizationSystem::InitializeMorphOption>();
     Unhook<Raw::CharacterCustomizationSystem::InitializeSwitcherOption>();
@@ -81,6 +89,12 @@ void App::CustomizationExtension::OnActivateSystem(App::CustomizationSystem* aSy
                                                    bool aIsMale, uintptr_t a4)
 {
     m_customizationActive = true;
+
+#ifdef __APPLE__
+    // macOS: GetResource is inlined everywhere (0 callers), so its hook never fires. Initialize reads the same
+    // male/female tokens at +0x48/+0x58 right after this hook, so merge here.
+    MergeCustomEntries(aSystem);
+#endif
 }
 
 void App::CustomizationExtension::OnDeactivateSystem(App::CustomizationSystem* aSystem)
@@ -88,41 +102,90 @@ void App::CustomizationExtension::OnDeactivateSystem(App::CustomizationSystem* a
     m_customizationActive = false;
 }
 
+#ifndef __APPLE__
 void App::CustomizationExtension::OnPrepareResource(App::CustomizationSystem* aSystem,
     Red::SharedPtr<Red::ResourceToken<Red::gameuiCharacterCustomizationInfoResource>>& aOut, bool aIsMale)
 {
     MergeCustomEntries(aSystem);
 }
+#endif
+
+namespace
+{
+#ifdef __APPLE__
+bool HasStateOption(Raw::CharacterCustomizationSystem::StateOptions& aOptions, Red::CName aName)
+{
+    for (const auto& key : aOptions.keys)
+    {
+        if (key == aName)
+            return true;
+    }
+    return false;
+}
+
+// Adds the key together with a value, keeping keys and values the same length. The game sorts the container before
+// its own lookup when NotSorted is set, so sort first and insert in order. The value is not read by the option
+// initializers (they only test whether the key exists).
+void AddStateOption(Raw::CharacterCustomizationSystem::StateOptions& aOptions, Red::CName aName)
+{
+    if (aOptions.keys.size != aOptions.values.size)
+        return;
+
+    if (aOptions.flags & static_cast<int32_t>(Raw::CharacterCustomizationSystem::StateOptions::Flags::NotSorted))
+    {
+        aOptions.Sort();
+    }
+
+    aOptions.Emplace(aName, uint64_t{0});
+}
+#else
+bool HasStateOption(Raw::CharacterCustomizationSystem::StateOptions& aOptions, Red::CName aName)
+{
+    return aOptions.Find(aName) != aOptions.end();
+}
+
+void AddStateOption(Raw::CharacterCustomizationSystem::StateOptions& aOptions, Red::CName aName)
+{
+    aOptions.Emplace(aName);
+}
+#endif
+}
 
 void App::CustomizationExtension::OnInitAppOption(App::CustomizationSystem* aSystem,
                                                   App::CustomizationPart aPartType,
                                                   App::CustomizationStateOption& aOption,
-                                                  Red::SortedUniqueArray<Red::CName>& aStateOptions,
+                                                  Raw::CharacterCustomizationSystem::StateOptions& aStateOptions,
                                                   Red::Map<Red::CName, App::CustomizationStateOption>& aUiSlots)
 {
-    bool found = aStateOptions.Find(aOption->info->name) != aStateOptions.end();
+    if (!aOption || !aOption->info)
+        return;
+
+    bool found = HasStateOption(aStateOptions, aOption->info->name);
 
     if (!found && !aOption->info->hidden && aOption->info->enabled)
     {
         if (IsCustomEntryName(aOption->info->name))
         {
-            aStateOptions.Emplace(aOption->info->name);
+            AddStateOption(aStateOptions, aOption->info->name);
         }
     }
 }
 
 void App::CustomizationExtension::OnInitMorphOption(App::CustomizationSystem* aSystem,
                                                     App::CustomizationStateOption& aOption,
-                                                    Red::SortedUniqueArray<Red::CName>& aStateOptions,
+                                                    Raw::CharacterCustomizationSystem::StateOptions& aStateOptions,
                                                     Red::Map<Red::CName, App::CustomizationStateOption>& aUiSlots)
 {
-    bool found = aStateOptions.Find(aOption->info->name) != aStateOptions.end();
+    if (!aOption || !aOption->info)
+        return;
+
+    bool found = HasStateOption(aStateOptions, aOption->info->name);
 
     if (!found && !aOption->info->hidden && aOption->info->enabled)
     {
         if (IsCustomEntryName(aOption->info->name))
         {
-            aStateOptions.Emplace(aOption->info->name);
+            AddStateOption(aStateOptions, aOption->info->name);
         }
     }
 }
@@ -152,8 +215,13 @@ void App::CustomizationExtension::OnGetAppearances(Red::gameuiICharacterCustomiz
     }
 }
 
+#ifdef __APPLE__
+void App::CustomizationExtension::OnChangeAppearance(App::AppearanceChangerSystem& aSystem,
+                                                     Red::AppearanceChangeRequest* aRequest, uintptr_t, uintptr_t)
+#else
 void App::CustomizationExtension::OnChangeAppearance(App::AppearanceChangerSystem& aSystem,
                                                      Red::AppearanceChangeRequest* aRequest, uintptr_t a3)
+#endif
 {
     if (/*m_customizationActive &&*/ !m_customAppOverrides.empty())
     {
@@ -168,12 +236,27 @@ void App::CustomizationExtension::OnChangeAppearance(App::AppearanceChangerSyste
     }
 }
 
+#ifdef __APPLE__
+void App::CustomizationExtension::OnChangeAppearances(App::AppearanceChangerSystem& aSystem,
+                                                      App::CustomizationPuppetWeak& aPuppet,
+                                                      Red::AppearanceDescriptor* aOldBegin,
+                                                      Red::AppearanceDescriptor* aOldEnd,
+                                                      Red::AppearanceDescriptor* aNewBegin,
+                                                      Red::AppearanceDescriptor* aNewEnd,
+                                                      uintptr_t a5, uint8_t a6)
+{
+    Red::Range<Red::AppearanceDescriptor> oldApp{aOldBegin, aOldEnd};
+    Red::Range<Red::AppearanceDescriptor> newApp{aNewBegin, aNewEnd};
+    auto& aOldApp = oldApp;
+    auto& aNewApp = newApp;
+#else
 void App::CustomizationExtension::OnChangeAppearances(App::AppearanceChangerSystem& aSystem,
                                                       App::CustomizationPuppet& aPuppet,
                                                       Red::Range<Red::AppearanceDescriptor>& aOldApp,
                                                       Red::Range<Red::AppearanceDescriptor>& aNewApp,
                                                       uintptr_t a5, uint8_t a6)
 {
+#endif
     if (/*m_customizationActive &&*/ !m_customAppOverrides.empty())
     {
         if (aOldApp)
@@ -270,6 +353,12 @@ void App::CustomizationExtension::MergeCustomEntries(App::CustomizationSystem* a
 void App::CustomizationExtension::MergeCustomEntries(CustomizationResourceToken& aTargetResource,
                                                      Core::Vector<CustomizationResourceToken>& aSourceResources)
 {
+    if (!aTargetResource)
+    {
+        LogError("[{}] Game customization resource is missing.", ExtensionName);
+        return;
+    }
+
     if (!aTargetResource.instance->finished)
     {
         Red::WaitForResource(aTargetResource, std::chrono::milliseconds(250));
@@ -281,6 +370,8 @@ void App::CustomizationExtension::MergeCustomEntries(CustomizationResourceToken&
     }
 
     auto& gameData = aTargetResource->Get();
+    if (!gameData)
+        return;
 
     FixCustomizationOptions(aTargetResource->path, gameData->armsCustomizationOptions);
     FixCustomizationOptions(aTargetResource->path, gameData->bodyCustomizationOptions);
@@ -288,7 +379,7 @@ void App::CustomizationExtension::MergeCustomEntries(CustomizationResourceToken&
 
     for (const auto& customResource : aSourceResources)
     {
-        if (!customResource->finished)
+        if (!customResource || !customResource->finished || !customResource->Get())
         {
             LogError("[{}] Mod customization resource is not ready.", ExtensionName);
             continue;
@@ -311,7 +402,7 @@ void App::CustomizationExtension::MergeCustomEntries(CustomizationResourceToken&
 
     for (const auto& customResource : aSourceResources)
     {
-        if (!customResource->finished)
+        if (!customResource || !customResource->finished || !customResource->Get())
             continue;
 
         auto& customData = customResource->Get();
@@ -656,10 +747,12 @@ void App::CustomizationExtension::RemoveCustomEntries()
 
 void App::CustomizationExtension::RemoveCustomEntries(App::CustomizationResourceToken& aTargetResource)
 {
-    if (!aTargetResource.instance->finished)
+    if (!aTargetResource || !aTargetResource.instance->finished)
         return;
 
     auto& gameData = aTargetResource->Get();
+    if (!gameData)
+        return;
 
     RemoveCustomGroups(gameData->armsGroups);
     RemoveCustomGroups(gameData->bodyGroups);
@@ -849,8 +942,12 @@ void App::CustomizationExtension::FixCustomizationAppearance(Red::AppearanceReso
             return;
         }
 
+        static const auto s_definitionType = Red::GetClass<Red::AppearanceDefinition>();
+        if (!s_definitionType)
+            return;
+
         auto newDefinition = Red::MakeHandle<Red::AppearanceDefinition>();
-        for (const auto prop : Red::GetClass<Red::AppearanceDefinition>()->props)
+        for (const auto prop : s_definitionType->props)
         {
             prop->SetValue(newDefinition.instance, prop->GetValuePtr<void>(sourceDefinition.instance));
         }

@@ -66,6 +66,16 @@ void App::ResourcePathRegistry::OnBootstrap()
     }
 }
 
+#ifdef __APPLE__
+void App::ResourcePathRegistry::OnCreatePath(uint64_t& aHash, const char* aPathStr, uint32_t aLength)
+{
+    if (aPathStr && aLength)
+    {
+        std::scoped_lock _(s_instance->m_lock);
+        s_instance->m_map[Red::ResourcePath(aHash)] = {aPathStr, aLength};
+    }
+}
+#else
 void App::ResourcePathRegistry::OnCreatePath(Red::ResourcePath* aPath, Red::StringView* aPathStr)
 {
     if (aPathStr && *aPathStr)
@@ -74,6 +84,7 @@ void App::ResourcePathRegistry::OnCreatePath(Red::ResourcePath* aPath, Red::Stri
         s_instance->m_map[*aPath] = {aPathStr->Data(), aPathStr->Length()};
     }
 }
+#endif
 
 std::string App::ResourcePathRegistry::ResolvePath(Red::ResourcePath aPath)
 {

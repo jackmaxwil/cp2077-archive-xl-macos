@@ -52,6 +52,16 @@ RED4EXT_ASSERT_OFFSET(AppearanceChangeRequest, newAppearance, 0x20);
 
 namespace Raw::AppearanceChanger
 {
+#ifdef __APPLE__
+// macOS: CString(x8 out; owner& x0, ownerOverride& x1, const Handle<Item_Record>& x2, const ItemID& x3).
+// GetSuffixValue does not exist on macOS: it is inlined into GetSuffixes (see RED4ext.SDK docs/re/appearance.md).
+constexpr auto GetSuffixes = Core::RawFunc<
+    /* addr = */ Red::AddressLib::AppearanceChanger_GetSuffixes,
+    /* type = */ Red::CString (*)(Red::Handle<Red::GameObject>& aOwner,
+                                  Red::Handle<Red::GameObject>& aOwnerOverride,
+                                  const Red::Handle<Red::TweakDBRecord>& aItemRecord,
+                                  const Red::ItemID& aItemID)>();
+#else
 constexpr auto GetSuffixes = Core::RawFunc<
     /* addr = */ Red::AddressLib::AppearanceChanger_GetSuffixes,
     /* type = */ void* (*)(Red::CString& aResult,
@@ -68,6 +78,7 @@ constexpr auto GetSuffixValue = Core::RawFunc<
                           Red::TweakDBID aSuffixRecordID,
                           Red::CString& aResult)>();
 using GetSuffixValuePtr = decltype(GetSuffixValue)::Callable;
+#endif
 
 constexpr auto RegisterPart = Core::RawFunc<
     /* addr = */ Red::AddressLib::AppearanceChanger_RegisterPart,
@@ -92,6 +103,16 @@ constexpr auto ComputePlayerGarment = Core::RawFunc<
                           uintptr_t a7,
                           bool a8)>();
 
+#ifdef __APPLE__
+// macOS: CName returned in x0, no out argument (record& x0, ItemID& x1, Handle<AppRes>& x2, a5 x3, name x4).
+constexpr auto SelectAppearanceName = Core::RawFunc<
+    /* addr = */ Red::AddressLib::AppearanceChanger_SelectAppearanceName,
+    /* type = */ Red::CName (*)(const Red::Handle<Red::TweakDBRecord>& aItemRecord,
+                                const Red::ItemID& aItemID,
+                                const Red::Handle<Red::AppearanceResource>& aAppearanceResource,
+                                uint64_t a5,
+                                Red::CName aAppearanceName)>();
+#else
 constexpr auto SelectAppearanceName = Core::RawFunc<
     /* addr = */ Red::AddressLib::AppearanceChanger_SelectAppearanceName,
     /* type = */ void* (*)(Red::CName* aOut,
@@ -100,10 +121,32 @@ constexpr auto SelectAppearanceName = Core::RawFunc<
                            const Red::Handle<Red::AppearanceResource>& aAppearanceResource,
                            uint64_t a5,
                            Red::CName aAppearanceName)>();
+#endif
 }
 
 namespace Raw::RuntimeSystemEntityAppearanceChanger
 {
+#ifdef __APPLE__
+// macOS: (system, request* x1, callback* x2, x3); every argument is forwarded to the original.
+constexpr auto ChangeAppearance = Core::RawFunc<
+    /* addr = */ Red::AddressLib::AppearanceChangeSystem_ChangeAppearance1,
+    /* type = */ void (*)(Red::world::RuntimeSystemEntityAppearanceChanger& aSystem,
+                          Red::AppearanceChangeRequest* aRequest,
+                          uintptr_t a3,
+                          uintptr_t a4)>();
+
+// macOS: both ranges arrive as raw begin/end pointers in x2..x5, a5 in x6 and a6 in w7.
+constexpr auto ChangeAppearances = Core::RawFunc<
+    /* addr = */ Red::AddressLib::AppearanceChangeSystem_ChangeAppearance2,
+    /* type = */ void (*)(Red::world::RuntimeSystemEntityAppearanceChanger& aSystem,
+                          Red::WeakHandle<Red::game::Puppet>& aTarget,
+                          Red::AppearanceDescriptor* aOldBegin,
+                          Red::AppearanceDescriptor* aOldEnd,
+                          Red::AppearanceDescriptor* aNewBegin,
+                          Red::AppearanceDescriptor* aNewEnd,
+                          uintptr_t a5,
+                          uint8_t a6)>();
+#else
 constexpr auto ChangeAppearance = Core::RawFunc<
     /* addr = */ Red::AddressLib::AppearanceChangeSystem_ChangeAppearance1,
     /* type = */ void (*)(Red::world::RuntimeSystemEntityAppearanceChanger& aSystem,
@@ -118,6 +161,7 @@ constexpr auto ChangeAppearances = Core::RawFunc<
                           Red::Range<Red::AppearanceDescriptor>& aNewApp,
                           uintptr_t a5,
                           uint8_t a6)>();
+#endif
 }
 
 

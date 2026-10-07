@@ -39,6 +39,20 @@ void App::ArchiveService::OnShutdown()
     Unhook<Raw::ResourceDepot::InitializeArchives>();
 }
 
+namespace
+{
+void LoadArchives(Red::ArchiveGroup& aGroup, const Red::DynArray<Red::CString>& aArchivePaths,
+                  Red::DynArray<Red::ResourcePath>& aLoadedResources)
+{
+#ifdef __APPLE__
+    Raw::ResourceDepot::LoadArchives(nullptr, aGroup, aArchivePaths, aLoadedResources, false,
+                                     Raw::ResourceDepot::LoadArchivesExitCode);
+#else
+    Raw::ResourceDepot::LoadArchives(nullptr, aGroup, aArchivePaths, aLoadedResources, false);
+#endif
+}
+}
+
 void App::ArchiveService::OnInitializeArchives(Red::ResourceDepot* aDepot)
 {
     Red::RegisterPendingTypes();
@@ -85,7 +99,7 @@ void App::ArchiveService::OnInitializeArchives(Red::ResourceDepot* aDepot)
 
         if (archivePaths.size > 0)
         {
-            Raw::ResourceDepot::LoadArchives(nullptr, group, archivePaths, loadedResources, false);
+            LoadArchives(group, archivePaths, loadedResources);
         }
     }
 
@@ -100,7 +114,7 @@ void App::ArchiveService::OnInitializeArchives(Red::ResourceDepot* aDepot)
         }
 
         auto& group = ResolveArchiveGroup(aDepot, "");
-        Raw::ResourceDepot::LoadArchives(nullptr, group, archivePaths, loadedResources, false);
+        LoadArchives(group, archivePaths, loadedResources);
     }
 
     for (const auto& archivePath : loadedArchives)

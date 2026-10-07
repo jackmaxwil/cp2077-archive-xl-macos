@@ -28,8 +28,16 @@ private:
     };
 
     void OnLoadJournal(uintptr_t a1, Red::JobGroup& aJobGroup);
+#ifdef __APPLE__
+    void OnInitializeRoot(Red::game::JournalRootFolderEntry* aRoot, uintptr_t, Red::JobQueue& aJobQueue);
+#else
     void OnInitializeRoot(Red::game::JournalRootFolderEntry* aRoot, uintptr_t, uintptr_t, Red::JobQueue& aJobQueue);
+#endif
+#ifdef __APPLE__
+    static void OnMappinDataLoaded(void* aMappinSystem, Red::worldRuntimeScene*, uintptr_t, uintptr_t);
+#else
     static void OnMappinDataLoaded(void* aMappinSystem, Red::worldRuntimeScene*);
+#endif
     static void* OnGetMappinData(void* aMappinSystem, uint32_t aHash);
     static void* OnGetPoiData(void* aMappinSystem, uint32_t aHash);
 

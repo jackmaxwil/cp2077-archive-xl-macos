@@ -139,7 +139,15 @@ public:
     using Type = R (*)(C*, Args...);
     using Callable = Type;
 
+#if defined(_WIN32) || defined(_WIN64)
     static constexpr uintptr_t offset = A;
+#else
+    // Offsets are written as MSVC vtable offsets. The macOS game uses the Itanium ABI, where the virtual destructor
+    // takes two slots (complete + deleting) instead of one, so every slot after the destructor is 8 bytes further.
+    // All ArchiveXL users name slots well after the destructor (MSVC 0x18 for ISerializable-derived classes).
+    static_assert(A > 0x18, "RawVFunc on macOS assumes a slot after the virtual destructor");
+    static constexpr uintptr_t offset = A + 0x8;
+#endif
 
     constexpr RawVFunc() = default;
 

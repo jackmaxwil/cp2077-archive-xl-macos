@@ -75,7 +75,12 @@ void App::PuppetStateExtension::OnTweakDBReady()
     });
 }
 
+#ifdef __APPLE__
+void App::PuppetStateExtension::OnAttachPuppet(Red::gameuiCharacterCustomizationGenitalsController* aComponent,
+                                               uintptr_t)
+#else
 void App::PuppetStateExtension::OnAttachPuppet(Red::gameuiCharacterCustomizationGenitalsController* aComponent)
+#endif
 {
 #ifndef NDEBUG
     LogDebug("[{}] [event=AttachPuppet ent={}]", ExtensionName, aComponent->owner->entityID.hash);

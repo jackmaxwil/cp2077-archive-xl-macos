@@ -42,17 +42,19 @@ public:
 private:
     void OnActivateSystem(CustomizationSystem* aSystem, CustomizationPuppet& aPuppet, bool aIsMale, uintptr_t a4);
     void OnDeactivateSystem(CustomizationSystem* aSystem);
+#ifndef __APPLE__
     void OnPrepareResource(CustomizationSystem* aSystem,
                            Red::SharedPtr<Red::ResourceToken<Red::gameuiCharacterCustomizationInfoResource>>& aOut,
                            bool aIsMale);
+#endif
     void OnInitAppOption(CustomizationSystem* aSystem,
                          CustomizationPart aPartType,
                          CustomizationStateOption& aOption,
-                         Red::SortedUniqueArray<Red::CName>& aStateOptions,
+                         Raw::CharacterCustomizationSystem::StateOptions& aStateOptions,
                          Red::Map<Red::CName, CustomizationStateOption>& aUiSlots);
     void OnInitMorphOption(CustomizationSystem* aSystem,
                            CustomizationStateOption& aOption,
-                           Red::SortedUniqueArray<Red::CName>& aStateOptions,
+                           Raw::CharacterCustomizationSystem::StateOptions& aStateOptions,
                            Red::Map<Red::CName, CustomizationStateOption>& aUiSlots);
     void OnInitSwitcherOption(CustomizationSystem* aSystem,
                               CustomizationPart aPartType,
@@ -62,6 +64,20 @@ private:
                               Red::Map<Red::CName, CustomizationStateOption>& aUiSlots);
     void OnGetAppearances(Red::gameuiICharacterCustomizationState* aState, Red::CName aGroupName, bool aIsFPP,
                           Red::DynArray<Red::AppearanceDescriptor>& aAppearances);
+#ifdef __APPLE__
+    void OnChangeAppearance(AppearanceChangerSystem& aSystem,
+                            Red::AppearanceChangeRequest* aRequest,
+                            uintptr_t a3,
+                            uintptr_t a4);
+    void OnChangeAppearances(AppearanceChangerSystem& aSystem,
+                             CustomizationPuppetWeak& aPuppet,
+                             Red::AppearanceDescriptor* aOldBegin,
+                             Red::AppearanceDescriptor* aOldEnd,
+                             Red::AppearanceDescriptor* aNewBegin,
+                             Red::AppearanceDescriptor* aNewEnd,
+                             uintptr_t a5,
+                             uint8_t a6);
+#else
     void OnChangeAppearance(AppearanceChangerSystem& aSystem,
                             Red::AppearanceChangeRequest* aRequest,
                             uintptr_t a3);
@@ -71,6 +87,7 @@ private:
                             Red::Range<Red::AppearanceDescriptor>& aNewApp,
                             uintptr_t a5,
                             uint8_t a6);
+#endif
 
     void RegisterCustomEntryName(Red::CName aName);
     void RegisterCustomEntryName(Red::CName aName, const Red::CString& aSubName);

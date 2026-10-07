@@ -26,9 +26,16 @@ constexpr auto CheckState = Core::RawFunc<
 
 namespace Raw::CharacterCustomizationGenitalsController
 {
+#ifdef __APPLE__
+// macOS: IComponent::OnAttach(this, ctx x1); x1 must be forwarded to the original.
+constexpr auto OnAttach = Core::RawFunc<
+    /* addr = */ Red::AddressLib::CharacterCustomizationGenitalsController_OnAttach,
+    /* type = */ void (*)(Red::game::ui::CharacterCustomizationGenitalsController* aComponent, uintptr_t a2)>();
+#else
 constexpr auto OnAttach = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationGenitalsController_OnAttach,
     /* type = */ void (*)(Red::game::ui::CharacterCustomizationGenitalsController* aComponent)>();
+#endif
 
 constexpr auto CheckState = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationGenitalsController_CheckState,
@@ -59,37 +66,37 @@ using ArmsGroups = Core::OffsetPtr<0x90, Red::DynArray<Red::gameuiCustomizationG
 
 constexpr auto GetHeadAppearances1 = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationState_GetHeadAppearances1,
-    /* type = */ void (*)(Red::gameuiICharacterCustomizationState* aState,
+    /* type = */ bool (*)(Red::gameuiICharacterCustomizationState* aState,
                           Red::CName aGroupName, bool aIsFPP,
                           Red::DynArray<Red::AppearanceDescriptor>& aAppearances)>();
 
 constexpr auto GetHeadAppearances2 = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationState_GetHeadAppearances2,
-    /* type = */ void (*)(Red::gameuiICharacterCustomizationState* aState,
+    /* type = */ bool (*)(Red::gameuiICharacterCustomizationState* aState,
                           Red::CName aGroupName, bool aIsFPP,
                           Red::DynArray<Red::AppearanceDescriptor>& aAppearances)>();
 
 constexpr auto GetBodyAppearances1 = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationState_GetBodyAppearances1,
-    /* type = */ void (*)(Red::gameuiICharacterCustomizationState* aState,
+    /* type = */ bool (*)(Red::gameuiICharacterCustomizationState* aState,
                           Red::CName aGroupName, bool aIsFPP,
                           Red::DynArray<Red::AppearanceDescriptor>& aAppearances)>();
 
 constexpr auto GetBodyAppearances2 = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationState_GetBodyAppearances2,
-    /* type = */ void (*)(Red::gameuiICharacterCustomizationState* aState,
+    /* type = */ bool (*)(Red::gameuiICharacterCustomizationState* aState,
                           Red::CName aGroupName, bool aIsFPP,
                           Red::DynArray<Red::AppearanceDescriptor>& aAppearances)>();
 
 constexpr auto GetArmsAppearances1 = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationState_GetArmsAppearances1,
-    /* type = */ void (*)(Red::gameuiICharacterCustomizationState* aState,
+    /* type = */ bool (*)(Red::gameuiICharacterCustomizationState* aState,
                           Red::CName aGroupName, bool aIsFPP,
                           Red::DynArray<Red::AppearanceDescriptor>& aAppearances)>();
 
 constexpr auto GetArmsAppearances2 = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationState_GetArmsAppearances2,
-    /* type = */ void (*)(Red::gameuiICharacterCustomizationState* aState,
+    /* type = */ bool (*)(Red::gameuiICharacterCustomizationState* aState,
                           Red::CName aGroupName, bool aIsFPP,
                           Red::DynArray<Red::AppearanceDescriptor>& aAppearances)>();
 }
@@ -110,25 +117,36 @@ constexpr auto Uninitialize = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationSystem_Uninitialize,
     /* type = */ void (*)(Red::gameuiICharacterCustomizationSystem* aSystem)>();
 
+#ifndef __APPLE__
+// macOS: GetResource has no callers (inlined), the merge runs from Initialize instead.
 constexpr auto GetResource = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationSystem_GetResource,
     /* type = */ void (*)(Red::gameuiICharacterCustomizationSystem* aSystem,
                           Red::SharedPtr<Red::ResourceToken<Red::gameuiCharacterCustomizationInfoResource>>& aOut,
                           bool aIsMale)>();
+#endif
+
+#ifdef __APPLE__
+// macOS: the state options container is red::Map<CName, 8-byte value> (keys @0, values @0x10, flags @0x20 with
+// bit 0 = NotSorted), built by 0x102463CB8; see RED4ext.SDK docs/re/charcustom.md.
+using StateOptions = Red::Map<Red::CName, uint64_t>;
+#else
+using StateOptions = Red::SortedUniqueArray<Red::CName>;
+#endif
 
 constexpr auto InitializeAppOption = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationSystem_InitializeAppOption,
     /* type = */ void (*)(Red::gameuiICharacterCustomizationSystem* aSystem,
                           Red::game::ui::CharacterCustomizationPart aPartType,
                           Red::Handle<Red::game::ui::CharacterCustomizationOption>& aOption,
-                          Red::SortedUniqueArray<Red::CName>& aStateOptions,
+                          StateOptions& aStateOptions,
                           Red::Map<Red::CName, Red::Handle<Red::game::ui::CharacterCustomizationOption>>& aUiSlots)>();
 
 constexpr auto InitializeMorphOption = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationSystem_InitializeMorphOption,
     /* type = */ void (*)(Red::gameuiICharacterCustomizationSystem* aSystem,
                           Red::Handle<Red::game::ui::CharacterCustomizationOption>& aOption,
-                          Red::SortedUniqueArray<Red::CName>& aStateOptions,
+                          StateOptions& aStateOptions,
                           Red::Map<Red::CName, Red::Handle<Red::game::ui::CharacterCustomizationOption>>& aUiSlots)>();
 
 constexpr auto InitializeSwitcherOption = Core::RawFunc<
@@ -141,9 +159,11 @@ constexpr auto InitializeSwitcherOption = Core::RawFunc<
                           Red::Map<Red::CName, Red::Handle<Red::game::ui::CharacterCustomizationOption>>& aUiSlots)>();
 }
 
+#ifndef __APPLE__
 namespace Raw::CharacterCustomizationHelper
 {
 constexpr auto GetHairColor = Core::RawFunc<
     /* addr = */ Red::AddressLib::CharacterCustomizationHelper_GetHairColor,
     /* type = */ void (*)(Red::CName& aOut, Red::WeakHandle<Red::ISerializable>& aSystem, bool aIsMale)>();
 }
+#endif

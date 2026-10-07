@@ -83,7 +83,14 @@ constexpr auto ExtractComponentsJob = Core::RawFunc<
     /* addr = */ Red::AddressLib::EntityBuilder_ExtractComponentsJob,
     /* type = */ void (*)(Red::EntityBuilderJobParams* aParams, void* a2)>();
 
+#ifdef __APPLE__
+// macOS: (EntityBuilder* x0, JobQueue& x1); the out-of-line (JobQueue&, ?, Params*) dispatcher is inlined here.
+constexpr auto ScheduleExtractComponentsJob = Core::RawFunc<
+    /* addr = */ Red::AddressLib::EntityBuilder_ScheduleExtractComponentsJob,
+    /* type = */ void (*)(Red::EntityBuilder* aBuilder, Red::JobQueue& aJobQueue)>();
+#else
 constexpr auto ScheduleExtractComponentsJob = Core::RawFunc<
     /* addr = */ Red::AddressLib::EntityBuilder_ScheduleExtractComponentsJob,
     /* type = */ void (*)(Red::JobQueue& aJobQueue, void* a2, Red::EntityBuilderJobParams* aParams)>();
+#endif
 }

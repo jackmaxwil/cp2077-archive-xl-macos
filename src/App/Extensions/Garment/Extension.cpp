@@ -1,4 +1,5 @@
 #include "Extension.hpp"
+#include "App/Extensions/Attachment/Extension.hpp"
 #include "App/Extensions/Customization/Extension.hpp"
 #include "App/Shared/ResourcePathRegistry.hpp"
 #include "Core/Facades/Container.hpp"
@@ -39,14 +40,27 @@ bool App::GarmentExtension::Load()
     HookBefore<Raw::ItemFactoryRequest::LoadAppearance>(&OnLoadAppearanceResource).OrThrow();
     HookBefore<Raw::ItemFactoryAppearanceChangeRequest::LoadAppearance>(&OnChangeAppearanceResource).OrThrow();
     Hook<Raw::EntityTemplate::FindAppearance>(&OnResolveAppearance).OrThrow();
+#ifdef __APPLE__
+    HookAfter<Raw::AppearanceResource::FindAppearance>(&OnFindDefinition).OrThrow();
+#else
     HookAfter<Raw::AppearanceResource::FindAppearance>(&OnResolveDefinition).OrThrow();
+#endif
     Hook<Raw::AppearanceChanger::GetSuffixes>(&OnResolveSuffixes).OrThrow();
     HookAfter<Raw::AppearanceNameVisualTagsPreset::GetVisualTags>(&OnGetVisualTags).OrThrow();
+#ifdef __APPLE__
+    HookAfter<Raw::GarmentAssembler::FindState>(&OnFindStateResult).OrThrow();
+#else
     HookAfter<Raw::GarmentAssembler::FindState>(&OnFindState).OrThrow();
+#endif
     HookBefore<Raw::GarmentAssemblerState::AddItem>(&OnAddItem).OrThrow();
     HookBefore<Raw::GarmentAssemblerState::AddCustomItem>(&OnAddCustomItem).OrThrow();
+#ifdef __APPLE__
+    HookBefore<Raw::GarmentAssembler::ChangeItem>(&OnChangeItem).OrThrow();
+    HookBefore<Raw::GarmentAssembler::ChangeCustomItem>(&OnChangeCustomItem).OrThrow();
+#else
     HookBefore<Raw::GarmentAssemblerState::ChangeItem>(&OnChangeItem).OrThrow();
     HookBefore<Raw::GarmentAssemblerState::ChangeCustomItem>(&OnChangeCustomItem).OrThrow();
+#endif
     HookBefore<Raw::GarmentAssembler::RemoveItem>(&OnRemoveItem).OrThrow();
     Hook<Raw::GarmentAssembler::ProcessGarment>(&OnProcessGarment).OrThrow();
     HookWrap<Raw::GarmentAssembler::ProcessSkinnedMesh>(&OnProcessGarmentMesh).OrThrow();
@@ -80,8 +94,13 @@ bool App::GarmentExtension::Unload()
     Unhook<Raw::GarmentAssembler::FindState>();
     Unhook<Raw::GarmentAssemblerState::AddItem>();
     Unhook<Raw::GarmentAssemblerState::AddCustomItem>();
+#ifdef __APPLE__
+    Unhook<Raw::GarmentAssembler::ChangeItem>();
+    Unhook<Raw::GarmentAssembler::ChangeCustomItem>();
+#else
     Unhook<Raw::GarmentAssemblerState::ChangeItem>();
     Unhook<Raw::GarmentAssemblerState::ChangeCustomItem>();
+#endif
     Unhook<Raw::GarmentAssembler::RemoveItem>();
     Unhook<Raw::GarmentAssembler::ProcessGarment>();
     Unhook<Raw::GarmentAssembler::ProcessSkinnedMesh>();
@@ -236,6 +255,15 @@ Red::TemplateAppearance* App::GarmentExtension::OnResolveAppearance(Red::EntityT
     return appearance;
 }
 
+#ifdef __APPLE__
+void App::GarmentExtension::OnFindDefinition(Red::Handle<Red::AppearanceDefinition>& aDefinition,
+                                             Red::AppearanceResource* aResource, Red::CName aSelector, uint32_t a4,
+                                             uint8_t a5)
+{
+    OnResolveDefinition(aResource, &aDefinition, aSelector, a4, a5);
+}
+#endif
+
 void App::GarmentExtension::OnResolveDefinition(Red::AppearanceResource* aResource,
                                                      Red::Handle<Red::AppearanceDefinition>* aDefinition,
                                                      Red::CName aSelector, uint32_t a4, uint8_t a5)
@@ -284,6 +312,30 @@ void App::GarmentExtension::OnResolveDefinition(Red::AppearanceResource* aResour
     }
 }
 
+#ifdef __APPLE__
+Red::CString App::GarmentExtension::OnResolveSuffixes(Red::Handle<Red::GameObject>& aOwner,
+                                                      Red::Handle<Red::GameObject>& aOwnerOverride,
+                                                      const Red::Handle<Red::TweakDBRecord>& aItemRecord,
+                                                      const Red::ItemID& aItemID)
+{
+    if (aItemRecord)
+    {
+        auto appearanceName = Red::GetFlatValue<Red::CName>({aItemRecord->recordID, ".appearanceName"});
+        if (s_dynamicAppearance->IsDynamicAppearanceName(appearanceName))
+            return {};
+    }
+
+    auto result = Raw::AppearanceChanger::GetSuffixes(aOwner, aOwnerOverride, aItemRecord, aItemID);
+
+    // GetSuffixValue is inlined into GetSuffixes on macOS, so the inner sleeves override is applied to the result.
+    if (aItemRecord)
+    {
+        AttachmentExtension::ApplyInnerSleevesSuffix(result, aOwner, aItemRecord->recordID, aItemID);
+    }
+
+    return result;
+}
+#else
 void* App::GarmentExtension::OnResolveSuffixes(Red::CString& aResult,
                                                     Red::Handle<Red::GameObject>& aOwner,
                                                     Red::Handle<Red::GameObject>& aOwnerOverride,
@@ -302,6 +354,7 @@ void* App::GarmentExtension::OnResolveSuffixes(Red::CString& aResult,
 
     return Raw::AppearanceChanger::GetSuffixes(aResult, aOwner, aOwnerOverride, aItemRecord, aItemID);
 }
+#endif
 
 void App::GarmentExtension::OnGetVisualTags(Red::AppearanceNameVisualTagsPreset* aPreset,
                                                  Red::ResourcePath aEntityPath, Red::CName aAppearanceName,
@@ -402,9 +455,14 @@ void App::GarmentExtension::OnGetVisualTags(Red::AppearanceNameVisualTagsPreset*
         return;
     }
 
+#ifdef __APPLE__
+    auto appearanceDefinition = Raw::AppearanceResource::FindAppearance(appearanceResource,
+                                                                        appearanceTemplate->appearanceName, 0, 0);
+#else
     Red::Handle<Red::AppearanceDefinition> appearanceDefinition;
     Raw::AppearanceResource::FindAppearance(appearanceResource, &appearanceDefinition,
                                             appearanceTemplate->appearanceName, 0, 0);
+#endif
     OnResolveDefinition(appearanceResource, &appearanceDefinition, appearanceTemplate->appearanceName, 0, 0);
 
     if (!appearanceDefinition)
@@ -432,6 +490,14 @@ void App::GarmentExtension::OnGetVisualTags(Red::AppearanceNameVisualTagsPreset*
     std::unique_lock _(s_dynamicTagsLock);
     s_dynamicTagsCache.insert_or_assign(cacheKey, std::move(dynamicTags));
 }
+
+#ifdef __APPLE__
+void App::GarmentExtension::OnFindStateResult(Red::GarmentAssemblerState& aState, uintptr_t aAggregator,
+                                        Red::WeakHandle<Red::Entity>& aEntityWeak)
+{
+    OnFindState(aAggregator, &aState, aEntityWeak);
+}
+#endif
 
 void App::GarmentExtension::OnFindState(uintptr_t, Red::GarmentAssemblerState* aState,
                                              Red::WeakHandle<Red::Entity>& aEntityWeak)
@@ -481,12 +547,27 @@ void App::GarmentExtension::OnAddCustomItem(Red::GarmentAssemblerState* aState,
     }
 }
 
+#ifdef __APPLE__
+// macOS: the hook sits on the aggregator-level wrapper, which runs before FindState links the state pointer, so the
+// entity state is found through the entity itself (as OnRemoveItem does).
+void App::GarmentExtension::OnChangeItem(uintptr_t, Red::WeakHandle<Red::Entity>& aEntityWeak,
+                                         Red::GarmentItemChangeRequest& aRequest)
+{
+    auto entity = aEntityWeak.Lock();
+    if (!entity)
+        return;
+
+    std::unique_lock _(s_mutex);
+    if (auto& entityState = s_stateManager->GetEntityState(entity))
+    {
+#else
 void App::GarmentExtension::OnChangeItem(Red::GarmentAssemblerState* aState,
                                               Red::GarmentItemChangeRequest& aRequest)
 {
     std::unique_lock _(s_mutex);
     if (auto& entityState = s_stateManager->FindEntityState(aState->unk00))
     {
+#endif
 #ifndef NDEBUG
         LogDebug("[{}] [event=ChangeItem entity={} item={} app={}]",
                  ExtensionName, entityState->GetName(), aRequest.hash, aRequest.apperance->name.ToString());
@@ -498,12 +579,25 @@ void App::GarmentExtension::OnChangeItem(Red::GarmentAssemblerState* aState,
     }
 }
 
+#ifdef __APPLE__
+void App::GarmentExtension::OnChangeCustomItem(uintptr_t, Red::WeakHandle<Red::Entity>& aEntityWeak,
+                                               Red::GarmentItemChangeCustomRequest& aRequest)
+{
+    auto entity = aEntityWeak.Lock();
+    if (!entity)
+        return;
+
+    std::unique_lock _(s_mutex);
+    if (auto& entityState = s_stateManager->GetEntityState(entity))
+    {
+#else
 void App::GarmentExtension::OnChangeCustomItem(Red::GarmentAssemblerState* aState,
                                                     Red::GarmentItemChangeCustomRequest& aRequest)
 {
     std::unique_lock _(s_mutex);
     if (auto& entityState = s_stateManager->FindEntityState(aState->unk00))
     {
+#endif
 #ifndef NDEBUG
         LogDebug("[{}] [event=ChangeCustomItem entity={} item={} app={}]",
                  ExtensionName, entityState->GetName(), aRequest.hash, aRequest.apperance->name.ToString());
@@ -547,6 +641,30 @@ void App::GarmentExtension::OnRegisterPart(uintptr_t, Red::Handle<Red::EntityTem
     UpdatePartAssignments(aComponentStorage->components, aPart->path);
 }
 
+#ifdef __APPLE__
+Raw::GarmentAssembler::GarmentProcessorPtr App::GarmentExtension::OnProcessGarment(
+    const Red::Handle<Red::AppearanceDefinition>& aDefinition, uintptr_t a2, Red::GarmentLoadingParams* aParams)
+{
+    if (!aParams)
+        return Raw::GarmentAssembler::ProcessGarment(aDefinition, a2, aParams);
+
+    std::unique_lock _(s_mutex);
+    if (auto& entityState = s_stateManager->FindEntityState(aParams->entity))
+    {
+#ifndef NDEBUG
+        LogDebug("[{}] [event=ProcessGarment entity={}]", ExtensionName, entityState->GetName());
+#endif
+
+        UpdateDynamicAttributes(entityState);
+    }
+
+    auto processor = Raw::GarmentAssembler::ProcessGarment(aDefinition, a2, aParams);
+
+    s_stateManager->LinkEntityToAssembler(aParams->entity, Raw::GarmentAssembler::GetProcessor(processor));
+
+    return processor;
+}
+#else
 uintptr_t App::GarmentExtension::OnProcessGarment(Red::SharedPtr<Red::GarmentProcessingContext>& aProcessor, uintptr_t a2,
                                                        uintptr_t a3, Red::GarmentLoadingParams* aParams)
 {
@@ -569,6 +687,7 @@ uintptr_t App::GarmentExtension::OnProcessGarment(Red::SharedPtr<Red::GarmentPro
 
     return result;
 }
+#endif
 
 void App::GarmentExtension::OnProcessGarmentMesh(Raw::GarmentAssembler::ProcessMesh aCallback,
                                                  Red::GarmentProcessingContext* aProcessor, uint32_t aIndex,

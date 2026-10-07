@@ -31,7 +31,11 @@ protected:
     };
 
     void OnBootstrap() override;
+#ifdef __APPLE__
+    static void OnCreatePath(uint64_t& aHash, const char* aPathStr, uint32_t aLength);
+#else
     static void OnCreatePath(Red::ResourcePath* aPath, Red::StringView* aPathStr);
+#endif
 
     inline static SharedInstance* s_instance;
     inline static std::filesystem::path s_preloadPath;

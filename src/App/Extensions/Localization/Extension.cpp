@@ -138,8 +138,12 @@ bool App::LocalizationExtension::MergeTextResource(const std::string& aPath, Tex
                                                 TextEntryMap& aUsedKeyMap, uint32_t aOriginalCount,
                                                 uint64_t aOriginalMaxKey, bool aFallback)
 {
+#ifdef __APPLE__
+    Red::Handle<TextResource> resource = Raw::Localization::LoadTexts(aPath.c_str());
+#else
     Red::Handle<TextResource> resource;
     Raw::Localization::LoadTexts(resource, aPath.c_str());
+#endif
 
     if (!resource.instance)
     {
@@ -305,8 +309,12 @@ void App::LocalizationExtension::OnLoadSubtitles(Red::Handle<SubtitleResource>& 
 
 bool App::LocalizationExtension::MergeSubtitleResource(const std::string& aPath, App::SubtitleEntryList& aFinalList)
 {
+#ifdef __APPLE__
+    Red::Handle<SubtitleResource> resource = Raw::Localization::LoadSubtitles(aPath.c_str());
+#else
     Red::Handle<SubtitleResource> resource;
     Raw::Localization::LoadSubtitles(resource, aPath.c_str());
+#endif
 
     if (!resource.instance)
     {

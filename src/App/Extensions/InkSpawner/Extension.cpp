@@ -50,6 +50,65 @@ bool App::InkSpawnerExtension::Unload()
     return true;
 }
 
+#ifdef __APPLE__
+Red::Handle<Red::ink::WidgetLibraryItemInstance> App::InkSpawnerExtension::OnSpawnLocal(
+    Red::ink::WidgetLibraryResource& aLibrary, Red::CName aItemName)
+{
+    auto instance = Raw::InkWidgetLibrary::SpawnFromLocal(aLibrary, aItemName);
+
+    if (!instance)
+    {
+        auto* itemNameStr = aItemName.ToString();
+        auto* controllerSep = itemNameStr ? strchr(itemNameStr, ControllerSeparator) : nullptr;
+
+        if (controllerSep)
+        {
+            Red::CName itemName(Red::FNV1a64(reinterpret_cast<const uint8_t*>(itemNameStr), controllerSep - itemNameStr));
+            instance = Raw::InkWidgetLibrary::SpawnFromLocal(aLibrary, itemName);
+
+            if (instance)
+            {
+                InjectController(instance, controllerSep + 1);
+            }
+        }
+    }
+
+    return instance;
+}
+
+Red::Handle<Red::ink::WidgetLibraryItemInstance> App::InkSpawnerExtension::OnSpawnExternal(
+    Red::ink::WidgetLibraryResource& aLibrary, Red::ResourcePath aExternalPath, Red::CName aItemName)
+{
+    InjectDependency(aLibrary, aExternalPath);
+
+    return Raw::InkWidgetLibrary::SpawnFromExternal(aLibrary, aExternalPath, aItemName);
+}
+
+bool App::InkSpawnerExtension::OnAsyncSpawnLocal(Red::ink::WidgetLibraryResource& aLibrary,
+                                                 Red::InkSpawningInfo& aSpawningInfo,
+                                                 Red::CName aItemName, bool a4)
+{
+    auto* itemNameStr = aItemName.ToString();
+    auto* controllerSep = itemNameStr ? strchr(itemNameStr, ControllerSeparator) : nullptr;
+
+    if (controllerSep)
+    {
+        aItemName = Red::FNV1a64(reinterpret_cast<const uint8_t*>(itemNameStr), controllerSep - itemNameStr);
+    }
+
+    return Raw::InkWidgetLibrary::AsyncSpawnFromLocal(aLibrary, aSpawningInfo, aItemName, a4);
+}
+
+bool App::InkSpawnerExtension::OnAsyncSpawnExternal(Red::ink::WidgetLibraryResource& aLibrary,
+                                                    Red::InkSpawningInfo& aSpawningInfo,
+                                                    Red::ResourcePath aExternalPath,
+                                                    Red::CName aItemName, bool a5)
+{
+    InjectDependency(aLibrary, aExternalPath);
+
+    return Raw::InkWidgetLibrary::AsyncSpawnFromExternal(aLibrary, aSpawningInfo, aExternalPath, aItemName, a5);
+}
+#else
 uintptr_t App::InkSpawnerExtension::OnSpawnLocal(Red::ink::WidgetLibraryResource& aLibrary,
                                                  Red::Handle<Red::ink::WidgetLibraryItemInstance>& aInstance,
                                                  Red::CName aItemName)
@@ -110,11 +169,18 @@ bool App::InkSpawnerExtension::OnAsyncSpawnExternal(Red::ink::WidgetLibraryResou
 
     return Raw::InkWidgetLibrary::AsyncSpawnFromExternal(aLibrary, aSpawningInfo, aExternalPath, aItemName);
 }
+#endif
 
 void App::InkSpawnerExtension::OnFinishAsyncSpawn(Red::InkSpawningContext& aContext,
                                                   Red::Handle<Red::ink::WidgetLibraryItemInstance>& aInstance)
 {
+    if (!aContext.request || !aInstance)
+        return;
+
     auto* itemNameStr = aContext.request->itemName.ToString();
+    if (!itemNameStr)
+        return;
+
     auto* controllerSep = strchr(itemNameStr, ControllerSeparator);
 
     if (controllerSep)
@@ -125,6 +191,16 @@ void App::InkSpawnerExtension::OnFinishAsyncSpawn(Red::InkSpawningContext& aCont
 
 void App::InkSpawnerExtension::InjectDependency(Red::ink::WidgetLibraryResource& aLibrary, Red::ResourcePath aExternalPath)
 {
+    // The SDK layout of inkWidgetLibraryResource differs on macOS (CResource tail padding); only touch
+    // externalLibraries when the compiled offset is where the game's RTTI puts it.
+    static const bool s_layoutMatches = RED_FIELD_MATCHES_RTTI(Red::ink::WidgetLibraryResource, externalLibraries);
+    if (!s_layoutMatches)
+    {
+        LogError("[{}] inkWidgetLibraryResource layout mismatch, external library injection is disabled.",
+                 ExtensionName);
+        return;
+    }
+
     bool libraryExists = false;
 
     // Check if the external library is in the list and do nothing if it is
@@ -159,7 +235,7 @@ void App::InkSpawnerExtension::InjectController(Red::Handle<Red::ink::WidgetLibr
 {
     auto* controllerType = Red::CRTTISystem::Get()->GetClass(aControllerName);
 
-    if (controllerType)
+    if (controllerType && aInstance && s_gameControllerType && s_logicControllerType)
     {
         if (controllerType->IsA(s_gameControllerType))
         {

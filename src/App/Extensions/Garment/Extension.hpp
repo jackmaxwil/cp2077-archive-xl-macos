@@ -35,26 +35,50 @@ private:
     static void OnResolveDefinition(Red::AppearanceResource* aResource,
                                     Red::Handle<Red::AppearanceDefinition>* aDefinition,
                                     Red::CName aAppearanceSelector, uint32_t a4, uint8_t a5);
+#ifdef __APPLE__
+    static void OnFindDefinition(Red::Handle<Red::AppearanceDefinition>& aDefinition,
+                                 Red::AppearanceResource* aResource,
+                                 Red::CName aAppearanceSelector, uint32_t a4, uint8_t a5);
+    static Red::CString OnResolveSuffixes(Red::Handle<Red::GameObject>& aOwner,
+                                          Red::Handle<Red::GameObject>& aOwnerOverride,
+                                          const Red::Handle<Red::TweakDBRecord>& aItemRecord,
+                                          const Red::ItemID& aItemID);
+#else
     static void* OnResolveSuffixes(Red::CString& aResult,
                                    Red::Handle<Red::GameObject>& aOwner,
                                    Red::Handle<Red::GameObject>& aOwnerOverride,
                                    const Red::TweakDBRecord& aItemRecord,
                                    const Red::ItemID& aItemID);
+#endif
     static void OnGetVisualTags(Red::AppearanceNameVisualTagsPreset* aPreset,
                                 Red::ResourcePath aEntityPath,
                                 Red::CName aAppearanceName,
                                 Red::TagList& aFinalTags);
     static void OnFindState(uintptr_t, Red::GarmentAssemblerState* aState, Red::WeakHandle<Red::Entity>& aEntityWeak);
+#ifdef __APPLE__
+    static void OnFindStateResult(Red::GarmentAssemblerState& aState, uintptr_t,
+                                  Red::WeakHandle<Red::Entity>& aEntityWeak);
+#endif
     static void OnAddItem(Red::GarmentAssemblerState* aState, Red::GarmentItemAddRequest&);
     static void OnAddCustomItem(Red::GarmentAssemblerState* aState, Red::GarmentItemAddCustomRequest&);
+#ifdef __APPLE__
+    static void OnChangeItem(uintptr_t, Red::WeakHandle<Red::Entity>&, Red::GarmentItemChangeRequest&);
+    static void OnChangeCustomItem(uintptr_t, Red::WeakHandle<Red::Entity>&, Red::GarmentItemChangeCustomRequest&);
+#else
     static void OnChangeItem(Red::GarmentAssemblerState* aState, Red::GarmentItemChangeRequest&);
     static void OnChangeCustomItem(Red::GarmentAssemblerState* aState, Red::GarmentItemChangeCustomRequest&);
+#endif
     static void OnRemoveItem(uintptr_t, Red::WeakHandle<Red::Entity>&, Red::GarmentItemRemoveRequest&);
     static void OnRegisterPart(uintptr_t, Red::Handle<Red::EntityTemplate>& aPart,
                                Red::Handle<Red::ComponentsStorage>& aComponents,
                                Red::Handle<Red::AppearanceDefinition>& aAppearance);
+#ifdef __APPLE__
+    static Raw::GarmentAssembler::GarmentProcessorPtr OnProcessGarment(
+        const Red::Handle<Red::AppearanceDefinition>& aDefinition, uintptr_t a2, Red::GarmentLoadingParams* aParams);
+#else
     static uintptr_t OnProcessGarment(Red::SharedPtr<Red::GarmentProcessingContext>& aProcessor, uintptr_t a2, uintptr_t a3,
                                       Red::GarmentLoadingParams* aParams);
+#endif
     static void OnProcessGarmentMesh(Raw::GarmentAssembler::ProcessMesh aCallback,
                                      Red::GarmentProcessingContext* aProcessor,
                                      uint32_t, const Red::Handle<Red::EntityTemplate>& aPartTemplate,

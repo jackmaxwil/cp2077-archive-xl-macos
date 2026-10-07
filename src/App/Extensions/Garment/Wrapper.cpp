@@ -340,7 +340,11 @@ bool App::ComponentWrapper::LoadAppearance() const
         auto meshApp = Raw::CMesh::GetAppearance(meshRef.token->resource, meshAppName);
         if (meshApp && meshApp->name == meshAppName)
         {
+#ifdef __APPLE__
+            Raw::MeshAppearance::LoadMaterialSetupAsync(*meshApp.GetPtr(), 0);
+#else
             Raw::MeshAppearance::LoadMaterialSetupAsync(*meshApp.GetPtr(), meshApp, 0);
+#endif
         }
     }
 

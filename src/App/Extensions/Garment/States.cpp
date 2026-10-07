@@ -493,8 +493,12 @@ bool App::EntityState::SelectDynamicAppearance(DynamicAppearanceName& aSelector,
     {
         if (match->name != aSelector.value)
         {
+            static const auto s_definitionType = Red::GetClass<Red::AppearanceDefinition>();
+            if (!s_definitionType)
+                return false;
+
             auto definition = Red::MakeHandle<Red::AppearanceDefinition>();
-            for (const auto prop : Red::GetClass<Red::AppearanceDefinition>()->props)
+            for (const auto prop : s_definitionType->props)
             {
                 prop->SetValue(definition.instance, prop->GetValuePtr<void>(match.instance));
             }

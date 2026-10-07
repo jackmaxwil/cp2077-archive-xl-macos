@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Red/Common.hpp"
 #include "Red/Entity.hpp"
 
 namespace Red
@@ -98,18 +99,54 @@ struct GarmentExtractionParams
 
 namespace Raw::GarmentAssembler
 {
+#ifdef __APPLE__
+// macOS: GarmentAssemblerState(x8 out 0x18; aggregator x0, WeakHandle<Entity>& x1).
+constexpr auto FindState = Core::RawFunc<
+    /* addr = */ Red::AddressLib::GarmentAssembler_FindState,
+    /* type = */ Red::GarmentAssemblerState (*)(uintptr_t, Red::WeakHandle<Red::ent::Entity>&)>();
+#else
 constexpr auto FindState = Core::RawFunc<
     /* addr = */ Red::AddressLib::GarmentAssembler_FindState,
     /* type = */ uintptr_t (*)(uintptr_t, Red::GarmentAssemblerState* aOut, Red::WeakHandle<Red::ent::Entity>&)>();
+#endif
 
 constexpr auto RemoveItem = Core::RawFunc<
     /* addr = */ Red::AddressLib::GarmentAssembler_RemoveItem,
     /* type = */ bool (*)(uintptr_t, Red::WeakHandle<Red::ent::Entity>&, Red::GarmentItemRemoveRequest&)>();
 
+#ifdef __APPLE__
+// macOS: SharedPtr<GarmentProcessingContext>(x8 out; const Handle<AppearanceDefinition>& x0, opts x1, params* x2).
+// The Windows aProcessor is the MSVC hidden return. The result is forwarded as an opaque {instance, refcount} pair:
+// ArchiveXL never owns the context, so it must not be able to destroy it (its allocator is the game's).
+using GarmentProcessorPtr = Red::SretValue<0x10>;
+
+inline Red::GarmentProcessingContext* GetProcessor(const GarmentProcessorPtr& aPtr)
+{
+    Red::GarmentProcessingContext* instance;
+    std::memcpy(&instance, aPtr.data, sizeof(instance));
+    return instance;
+}
+
+constexpr auto ProcessGarment = Core::RawFunc<
+    /* addr = */ Red::AddressLib::GarmentAssembler_ProcessGarment,
+    /* type = */ GarmentProcessorPtr (*)(const Red::Handle<Red::AppearanceDefinition>& aDefinition, uintptr_t a2,
+                                         Red::GarmentLoadingParams* aParams)>();
+
+// macOS: the state-level ChangeItem/ChangeCustomItem are inlined into these aggregator-level wrappers
+// (0x1036F87E4 / 0x1036F890C), which take (aggregator, WeakHandle<Entity>&, request&).
+constexpr auto ChangeItem = Core::RawFunc<
+    /* addr = */ Red::AddressLib::GarmentAssembler_ChangeItem,
+    /* type = */ bool (*)(uintptr_t, Red::WeakHandle<Red::ent::Entity>&, Red::GarmentItemChangeRequest&)>();
+
+constexpr auto ChangeCustomItem = Core::RawFunc<
+    /* addr = */ Red::AddressLib::GarmentAssembler_ChangeCustomItem,
+    /* type = */ bool (*)(uintptr_t, Red::WeakHandle<Red::ent::Entity>&, Red::GarmentItemChangeCustomRequest&)>();
+#else
 constexpr auto ProcessGarment = Core::RawFunc<
     /* addr = */ Red::AddressLib::GarmentAssembler_ProcessGarment,
     /* type = */ uintptr_t (*)(Red::SharedPtr<Red::GarmentProcessingContext>& aProcessor, uintptr_t a2, uintptr_t a3,
                                Red::GarmentLoadingParams* aParams)>();
+#endif
 
 constexpr auto ExtractComponentsJob = Core::RawFunc<
     /* addr = */ Red::AddressLib::GarmentAssembler_ExtractComponentsJob,
@@ -145,6 +182,7 @@ constexpr auto AddCustomItem = Core::RawFunc<
     /* addr = */ Red::AddressLib::GarmentAssemblerState_AddCustomItem,
     /* type = */ bool (*)(Red::GarmentAssemblerState* aState, Red::GarmentItemAddCustomRequest&)>();
 
+#ifndef __APPLE__
 constexpr auto ChangeItem = Core::RawFunc<
     /* addr = */ Red::AddressLib::GarmentAssemblerState_ChangeItem,
     /* type = */ bool (*)(Red::GarmentAssemblerState* aState, Red::GarmentItemChangeRequest&)>();
@@ -152,4 +190,5 @@ constexpr auto ChangeItem = Core::RawFunc<
 constexpr auto ChangeCustomItem = Core::RawFunc<
     /* addr = */ Red::AddressLib::GarmentAssemblerState_ChangeCustomItem,
     /* type = */ bool (*)(Red::GarmentAssemblerState* aState, Red::GarmentItemChangeCustomRequest&)>();
+#endif
 }

@@ -187,14 +187,31 @@ bool App::MeshExtension::OnPreloadAppearances(Red::CMesh* aMesh)
     return result;
 }
 
+#ifdef __APPLE__
+Red::MeshMaterialsToken App::MeshExtension::OnLoadMaterials(Red::CMesh* aTargetMesh,
+                                                            const Red::DynArray<Red::CName>& aMaterialNames,
+                                                            uint8_t a4)
+{
+    auto token = Raw::CMesh::LoadMaterialsAsync(aTargetMesh, aMaterialNames, a4);
+    PatchLoadedMaterials(aTargetMesh, token, aMaterialNames);
+    return token;
+}
+#else
 void* App::MeshExtension::OnLoadMaterials(Red::CMesh* aTargetMesh, Red::MeshMaterialsToken& aToken,
                                           const Red::DynArray<Red::CName>& aMaterialNames, uint8_t a4)
 {
     Raw::CMesh::LoadMaterialsAsync(aTargetMesh, aToken, aMaterialNames, a4);
+    PatchLoadedMaterials(aTargetMesh, aToken, aMaterialNames);
+    return &aToken;
+}
+#endif
 
-    if (!aTargetMesh->path || aMaterialNames.size == 0 || aToken.data->materials.size != aMaterialNames.size ||
-        !ContainsUnresolvedMaterials(aToken.data->materials))
-        return &aToken;
+void App::MeshExtension::PatchLoadedMaterials(Red::CMesh* aTargetMesh, Red::MeshMaterialsToken& aToken,
+                                              const Red::DynArray<Red::CName>& aMaterialNames)
+{
+    if (!aTargetMesh->path || aMaterialNames.size == 0 || !aToken.data ||
+        aToken.data->materials.size != aMaterialNames.size || !ContainsUnresolvedMaterials(aToken.data->materials))
+        return;
 
     Red::JobQueue jobQueue;
     jobQueue.Wait(aToken.job);
@@ -259,8 +276,6 @@ void* App::MeshExtension::OnLoadMaterials(Red::CMesh* aTargetMesh, Red::MeshMate
     });
 
     aToken.job = std::move(jobQueue.Capture());
-
-    return &aToken;
 }
 
 void App::MeshExtension::ProcessDynamicMaterials(const Core::SharedPtr<DynamicContext>& aContext,
@@ -384,9 +399,14 @@ void App::MeshExtension::ProcessDynamicMaterials(const Core::SharedPtr<DynamicCo
         {
             if (sourceEntry.isLocalInstance)
             {
+#ifdef __APPLE__
+                chunk->sourceToken = Raw::MeshMaterialBuffer::LoadMaterialAsync(
+                    &aContext->sourceMesh->localMaterialBuffer, aContext->sourceMesh, sourceEntry.index, 0, 0);
+#else
                 Raw::MeshMaterialBuffer::LoadMaterialAsync(&aContext->sourceMesh->localMaterialBuffer,
                                                            chunk->sourceToken, aContext->sourceMesh,
                                                            sourceEntry.index, 0, 0);
+#endif
 
                 if (!chunk->sourceToken || chunk->sourceToken->IsFailed())
                 {
@@ -1039,8 +1059,13 @@ void App::MeshExtension::MeshState::PrefetchContext(Red::CMesh* aMesh)
     auto contextIndex = GetTemplateEntryIndex(ContextMaterialName);
     if (contextIndex == 0)
     {
+#ifdef __APPLE__
+        contextToken = Raw::MeshMaterialBuffer::LoadMaterialAsync(&aMesh->localMaterialBuffer, Red::AsHandle(aMesh),
+                                                                  aMesh->materialEntries[contextIndex].index, 0, 0);
+#else
         Raw::MeshMaterialBuffer::LoadMaterialAsync(&aMesh->localMaterialBuffer, contextToken, Red::AsHandle(aMesh),
                                                    aMesh->materialEntries[contextIndex].index, 0, 0);
+#endif
     }
 }
 

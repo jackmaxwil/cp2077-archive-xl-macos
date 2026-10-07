@@ -13,6 +13,17 @@ public:
     bool Unload() override;
 
 private:
+#ifdef __APPLE__
+    static Red::Handle<Red::ink::WidgetLibraryItemInstance> OnSpawnLocal(Red::ink::WidgetLibraryResource& aLibrary,
+                                                                         Red::CName aItemName);
+    static Red::Handle<Red::ink::WidgetLibraryItemInstance> OnSpawnExternal(Red::ink::WidgetLibraryResource& aLibrary,
+                                                                            Red::ResourcePath aExternalPath,
+                                                                            Red::CName aItemName);
+    static bool OnAsyncSpawnLocal(Red::ink::WidgetLibraryResource& aLibrary, Red::InkSpawningInfo& aSpawningInfo,
+                                  Red::CName aItemName, bool a4);
+    static bool OnAsyncSpawnExternal(Red::ink::WidgetLibraryResource& aLibrary, Red::InkSpawningInfo& aSpawningInfo,
+                                     Red::ResourcePath aExternalPath, Red::CName aItemName, bool a5);
+#else
     static uintptr_t OnSpawnLocal(Red::ink::WidgetLibraryResource& aLibrary,
                                   Red::Handle<Red::ink::WidgetLibraryItemInstance>& aInstance,
                                   Red::CName aItemName);
@@ -30,6 +41,7 @@ private:
                                      Red::InkSpawningInfo& aSpawningInfo,
                                      Red::ResourcePath aExternalPath,
                                      Red::CName aItemName);
+#endif
 
     static void OnFinishAsyncSpawn(Red::InkSpawningContext& aContext,
                                    Red::Handle<Red::ink::WidgetLibraryItemInstance>& aInstance);

@@ -171,7 +171,7 @@ using FactManager = Core::OffsetPtr<0xF8, Red::FactManager*>;
 
 constexpr auto OnGameRestored = Core::RawFunc<
     /* addr = */ Red::AddressLib::QuestsSystem_OnGameRestored,
-    /* type = */ void (*)(Red::QuestsSystem* aSystem)>();
+    /* type = */ bool (*)(Red::QuestsSystem* aSystem)>(); // returns bool (always 1 on macOS)
 
 constexpr auto ForceStartNode = Core::RawVFunc<
     /* addr = */ 0x240,
@@ -183,7 +183,7 @@ namespace Raw::QuestRootInstance
 {
 constexpr auto Start = Core::RawFunc<
     /* addr = */ Red::AddressLib::QuestRootInstance_Start,
-    /* type = */ void (*)(Red::questRootInstance* aInstance,
+    /* type = */ bool (*)(Red::questRootInstance* aInstance,
                           Red::QuestContext* aContext,
                           const Red::Handle<Red::questQuestResource>& aResource)>();
 }

@@ -87,12 +87,17 @@ void App::JournalExtension::OnLoadJournal(uintptr_t a1, Red::JobGroup& aJobGroup
     }
 }
 
+#ifdef __APPLE__
+void App::JournalExtension::OnInitializeRoot(Red::game::JournalRootFolderEntry* aJournalRoot, uintptr_t,
+                                             Red::JobQueue& aJobQueue)
+#else
 void App::JournalExtension::OnInitializeRoot(Red::game::JournalRootFolderEntry* aJournalRoot, uintptr_t, uintptr_t,
                                           Red::JobQueue& aJobQueue)
+#endif
 {
     static const auto s_rootEntryType = Red::GetClass<Red::game::JournalRootFolderEntry>();
 
-    if (m_configs.empty())
+    if (m_configs.empty() || !s_rootEntryType || !aJournalRoot)
         return;
 
     auto successAll = true;
@@ -107,9 +112,9 @@ void App::JournalExtension::OnInitializeRoot(Red::game::JournalRootFolderEntry* 
             continue;
         }
 
-        auto root = resource->Get()->entry.GetPtr<Red::game::JournalContainerEntry>();
+        auto root = resource->Get() ? resource->Get()->entry.GetPtr<Red::game::JournalContainerEntry>() : nullptr;
 
-        if (!root->GetType()->IsA(s_rootEntryType))
+        if (!root || !root->GetType()->IsA(s_rootEntryType))
         {
             LogError("[{}] Resource \"{}\" root entry must be {}.",
                      ExtensionName, s_paths[resource->path], s_rootEntryType->GetName().ToString());
@@ -135,8 +140,38 @@ void App::JournalExtension::OnInitializeRoot(Red::game::JournalRootFolderEntry* 
     }
 }
 
-void App::JournalExtension::OnMappinDataLoaded(void* aMappinSystem, Red::worldRuntimeScene*)
+namespace
 {
+// The mappin getters' first argument: the cooked resource itself on macOS (resource-level hook), the system on Windows.
+Red::gameMappinResource* GetCookedMappinResource(void* aOwner)
+{
+#ifdef __APPLE__
+    return static_cast<Red::gameMappinResource*>(aOwner);
+#else
+    return Raw::MappinSystem::CookedMappinResource::Ptr(aOwner)->instance;
+#endif
+}
+
+Red::gamePointOfInterestMappinResource* GetCookedPoiResource(void* aOwner)
+{
+#ifdef __APPLE__
+    return static_cast<Red::gamePointOfInterestMappinResource*>(aOwner);
+#else
+    return Raw::MappinSystem::CookedPoiResource::Ptr(aOwner)->instance;
+#endif
+}
+}
+
+#ifdef __APPLE__
+void App::JournalExtension::OnMappinDataLoaded(void* aMappinSystem, Red::worldRuntimeScene*, uintptr_t, uintptr_t)
+#else
+void App::JournalExtension::OnMappinDataLoaded(void* aMappinSystem, Red::worldRuntimeScene*)
+#endif
+{
+    if (!Raw::MappinSystem::CookedMappinResource::Ptr(aMappinSystem)->instance ||
+        !Raw::MappinSystem::CookedPoiResource::Ptr(aMappinSystem)->instance)
+        return;
+
     auto cookedMappinResource = Raw::MappinSystem::CookedMappinResource::Ptr(aMappinSystem)->instance;
     if (cookedMappinResource->cookedData.size && cookedMappinResource->cookedData.size == cookedMappinResource->cookedData.capacity)
     {
@@ -223,7 +258,7 @@ void App::JournalExtension::ResolveCookedMappin(void* aMappinSystem, uint32_t aH
             cookedMappin.entityID.hash = aJournalMappin.reference.hash;
 
             std::unique_lock _(s_mappinsLock);
-            auto resource = Raw::MappinSystem::CookedPoiResource::Ptr(aMappinSystem)->instance;
+            auto resource = GetCookedPoiResource(aMappinSystem);
             resource->cookedData.PushBack(std::move(cookedMappin));
 
             aCookedMappin = resource->cookedData.End() - 1;
@@ -240,7 +275,7 @@ void App::JournalExtension::ResolveCookedMappin(void* aMappinSystem, uint32_t aH
             cookedMappin.journalPathHash = aHash;
 
             std::unique_lock _(s_mappinsLock);
-            auto resource = Raw::MappinSystem::CookedMappinResource::Ptr(aMappinSystem)->instance;
+            auto resource = GetCookedMappinResource(aMappinSystem);
             resource->cookedData.PushBack(std::move(cookedMappin));
 
             aCookedMappin = resource->cookedData.End() - 1;
@@ -305,8 +340,15 @@ bool App::JournalExtension::ResolveMappinVolune(uint32_t aJournalHash,
 
     auto nativeNodeRegistry = Red::GetRuntimeSystem<Red::worldNodeInstanceRegistry>();
 
+    if (!nativeNodeRegistry)
+        return false;
+
+#ifdef __APPLE__
+    auto nodeInstance = Raw::WorldNodeRegistry::FindNode(nativeNodeRegistry, aMappin.resolved.hash);
+#else
     Red::Handle<Red::worldINodeInstance> nodeInstance;
     Raw::WorldNodeRegistry::FindNode(nativeNodeRegistry, nodeInstance, aMappin.resolved.hash);
+#endif
 
     if (!nodeInstance)
         return false;
@@ -559,6 +601,10 @@ void App::JournalExtension::ResetRuntimeData()
 
 void App::JournalExtension::ReloadJournal()
 {
+#ifdef __APPLE__
+    // Unreachable on macOS: hot reload is disabled (see ExtensionService::Configure), and the journal manager's
+    // by-hash entry lookup is not identified on macOS.
+#else
     auto manager = Red::GetGameSystem<Red::game::IJournalManager>();
 
     if (!manager)
@@ -608,6 +654,7 @@ void App::JournalExtension::ReloadJournal()
         if (poiHash)
             Raw::JournalManager::TrackPointOfInterest(manager, poi);
     }
+#endif
 }
 
 std::string App::JournalExtension::MakePath(const std::string& aPath, const std::string& aStep)

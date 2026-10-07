@@ -37,7 +37,13 @@ private:
     static void OnAppearanceResourceLoad(Red::AppearanceResource* aResource);
     static void OnMeshResourceLoad(Red::CMesh* aMesh, Red::PostLoadParams* aParams);
     static void OnMorphTargetResourceLoad(Red::MorphTargetMesh* aMorphTarget, Red::PostLoadParams* aParams);
+#ifdef __APPLE__
+    static void OnEntityPackageLoad(Red::EntityBuilder* aBuilder, Red::JobQueue& aJobQueue);
+#else
     static void OnEntityPackageLoad(Red::JobQueue& aJobQueue, void*, Red::EntityBuilderJobParams* aParams);
+#endif
+    static void DispatchEntityPackagePatches(Red::JobQueue& aJobQueue,
+                                             const Red::WeakPtr<Red::EntityBuilder>& aBuilderWeak);
     static void OnPartPackageExtract(Red::DynArray<Red::Handle<Red::ISerializable>>& aResultObjects,
                                      const Red::SharedPtr<Red::ResourceToken<Red::EntityTemplate>>& aPartToken);
     static void OnGarmentPackageExtract(Red::GarmentExtractionParams* aParams, const Red::JobGroup& aJobGroup);

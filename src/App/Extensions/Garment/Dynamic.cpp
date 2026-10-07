@@ -1,4 +1,5 @@
 #include "Dynamic.hpp"
+#include "App/Extensions/Attachment/Extension.hpp"
 #include "App/Extensions/Garment/Wrapper.hpp"
 #include "App/Extensions/PuppetState/Extension.hpp"
 #include "App/Extensions/ResourceLink/Extension.hpp"
@@ -594,6 +595,98 @@ void App::DynamicAppearanceController::RemoveState(Red::Entity* aEntity)
     m_states.erase(aEntity);
 }
 
+#ifdef __APPLE__
+namespace
+{
+// macOS: CharacterCustomizationHelper::GetHairColor is inlined into 0x1037349E0 (no function exists). Same steps
+// (RED4ext.SDK docs/re/charcustom.md): state = system vtable +0x1F8 GetState(isMale) (Handle through x8, null when the
+// gender differs), then the first name of ItemFactory.HairColors.hairColors for which state vtable +0x240
+// HasOption(CName) is true. These are macOS (Itanium) vtable offsets.
+Red::CName GetHairColor(Red::game::ui::ICharacterCustomizationSystem* aSystem, bool aIsMale)
+{
+    using GetState_t = Red::Handle<Red::IScriptable> (*)(Red::game::ui::ICharacterCustomizationSystem*, bool);
+    using HasOption_t = bool (*)(Red::IScriptable*, Red::CName);
+
+    const auto hairColors = Red::GetFlatPtr<Red::DynArray<Red::CName>>("ItemFactory.HairColors.hairColors");
+    if (!aSystem || !hairColors)
+        return {};
+
+    const auto getState = *reinterpret_cast<GetState_t*>(*reinterpret_cast<uintptr_t*>(aSystem) + 0x1F8);
+    const auto state = getState(aSystem, aIsMale);
+    if (!state)
+        return {};
+
+    const auto hasOption = *reinterpret_cast<HasOption_t*>(*reinterpret_cast<uintptr_t*>(state.instance) + 0x240);
+    for (const auto& name : *hairColors)
+    {
+        if (hasOption(state.instance, name))
+            return name;
+    }
+
+    return {};
+}
+
+// macOS: AppearanceChanger::GetSuffixValue does not exist as a function; it is inlined into GetSuffixes (0x10370D924,
+// see RED4ext.SDK docs/re/appearance.md). This evaluates one suffix the way the inlined code does.
+
+// Camera: GetSuffixes starts from "TPP" and, when the entity has a TPPRepresentationComponent, picks "TPP" if the
+// component's mode (u32 at +0x188, read with acquire) is 2..4 and "FPP" otherwise (0x10370DD74..0x10370DDBC and
+// 0x1035A1C18).
+Red::CString GetCameraSuffix(Red::Entity* aEntity)
+{
+    static const auto s_tppType = Red::GetClass<Red::game::TPPRepresentationComponent>();
+
+    if (s_tppType)
+    {
+        for (const auto& component : aEntity->components)
+        {
+            if (component && component->GetType()->IsA(s_tppType))
+            {
+                const auto mode = __atomic_load_n(
+                    reinterpret_cast<const uint32_t*>(reinterpret_cast<uintptr_t>(component.instance) + 0x188),
+                    __ATOMIC_ACQUIRE);
+                return (mode - 2u) < 3u ? "TPP" : "FPP";
+            }
+        }
+    }
+
+    return "TPP";
+}
+
+// Scripted suffixes: <system>.<function>(ItemID, wref<GameObject>, ref<ItemsFactoryAppearanceSuffixBase_Record>).
+Red::CString GetScriptedSuffix(Red::Handle<Red::GameObject>& aOwner, Red::TweakDBID aSuffixID,
+                               Red::TweakDBID aEquippedItemID)
+{
+    Red::CString result;
+
+    const auto systemName = Red::GetFlatValue<Red::CName>({aSuffixID, ".scriptedSystem"});
+    const auto functionName = Red::GetFlatValue<Red::CName>({aSuffixID, ".scriptedFunction"});
+    if (!systemName || !functionName)
+        return result;
+
+    Red::Handle<Red::IScriptable> container;
+    Red::ScriptGameInstance game{};
+    if (!Red::CallStatic("ScriptGameInstance", "GetScriptableSystemsContainer", container, game) || !container)
+        return result;
+
+    Red::Handle<Red::IScriptable> system;
+    if (!Red::CallVirtual(container, "Get", system, systemName) || !system)
+        return result;
+
+    auto record = Red::TweakDB::Get()->GetRecord(aSuffixID);
+    if (!record)
+        return result;
+
+    Red::ItemID itemID{aEquippedItemID};
+    Red::WeakHandle<Red::GameObject> owner = aOwner;
+
+    Red::CallVirtual(system, functionName, result, itemID, owner, record);
+
+    return result;
+}
+}
+#endif
+
 App::DynamicAttributeData App::DynamicAppearanceController::GetSuffixData(Red::Entity* aEntity,
                                                                           Red::TweakDBID aSuffixID,
                                                                           Red::TweakDBID aEquippedItemID) const
@@ -604,8 +697,28 @@ App::DynamicAttributeData App::DynamicAppearanceController::GetSuffixData(Red::E
     {
         auto* handle = reinterpret_cast<Red::Handle<Red::GameObject>*>(&aEntity->ref);
 
+#ifdef __APPLE__
+        Red::CString suffixValue;
+        if (aSuffixID == CameraSuffix)
+        {
+            suffixValue = GetCameraSuffix(aEntity);
+        }
+        else if (aSuffixID == GenderSuffix)
+        {
+            suffixValue = IsMale(aEntity) ? MaleSuffixValue : FemaleSuffixValue;
+        }
+        else if (aSuffixID == InnerSleevesSuffix)
+        {
+            suffixValue = AttachmentExtension::GetInnerSleevesSuffix(*handle, Red::ItemID{aEquippedItemID});
+        }
+        else
+        {
+            suffixValue = GetScriptedSuffix(*handle, aSuffixID, aEquippedItemID);
+        }
+#else
         Red::CString suffixValue;
         (~Raw::AppearanceChanger::GetSuffixValue)({aEquippedItemID}, 1ull, *handle, aSuffixID, suffixValue);
+#endif
 
         data.suffix = suffixValue.c_str();
     }
@@ -629,6 +742,9 @@ App::DynamicAppearanceController::CustomizationData App::DynamicAppearanceContro
 
     CustomizationData data{};
 
+    if (!system)
+        return data;
+
     for (const auto& component : aEntity->components | std::views::reverse)
     {
         switch (component->name)
@@ -649,7 +765,11 @@ App::DynamicAppearanceController::CustomizationData App::DynamicAppearanceContro
         }
     }
 
+#ifdef __APPLE__
+    data.hairColor = GetHairColor(system, data.isMale);
+#else
     Raw::CharacterCustomizationHelper::GetHairColor(data.hairColor, system->ref, data.isMale);
+#endif
 
     return data;
 }

@@ -205,9 +205,14 @@ void App::ResourceLinkExtension::Configure()
     m_configs.clear();
 }
 
+#ifdef __APPLE__
+void App::ResourceLinkExtension::OnLoaderResourceRequest(Red::ResourceLoader* aLoader,
+                                                         Red::ResourceRequest& aRequest)
+#else
 void App::ResourceLinkExtension::OnLoaderResourceRequest(Red::ResourceLoader* aLoader,
                                                          Red::SharedPtr<Red::ResourceToken<>>& aToken,
                                                          Red::ResourceRequest& aRequest)
+#endif
 {
     std::shared_lock _(s_linksLock);
     const auto& link = s_links.find(aRequest.path);
@@ -217,6 +222,23 @@ void App::ResourceLinkExtension::OnLoaderResourceRequest(Red::ResourceLoader* aL
     }
 }
 
+#ifdef __APPLE__
+Raw::ResourceDepot::ResourceHandle App::ResourceLinkExtension::OnDepotResourceRequest(Red::ResourceDepot* aDepot,
+                                                                                      Red::ResourcePath aPath,
+                                                                                      const int32_t* aArchiveHandle)
+{
+    {
+        std::shared_lock _(s_copiesLock);
+        const auto& link = s_copies.find(aPath);
+        if (link != s_copies.end())
+        {
+            aPath = link->second;
+        }
+    }
+
+    return Raw::ResourceDepot::RequestResource(aDepot, aPath, aArchiveHandle);
+}
+#else
 uintptr_t* App::ResourceLinkExtension::OnDepotResourceRequest(Red::ResourceDepot* aDepot,
                                                               const uintptr_t* aResourceHandle,
                                                               Red::ResourcePath aPath,
@@ -233,6 +255,7 @@ uintptr_t* App::ResourceLinkExtension::OnDepotResourceRequest(Red::ResourceDepot
 
     return Raw::ResourceDepot::RequestResource(aDepot, aResourceHandle, aPath, aArchiveHandle);
 }
+#endif
 
 bool App::ResourceLinkExtension::OnDepotResourceCheck(Red::ResourceDepot* aDepot, Red::ResourcePath aPath)
 {

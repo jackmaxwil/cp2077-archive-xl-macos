@@ -73,6 +73,11 @@ void App::ExtensionService::OnShutdown()
 
 void App::ExtensionService::Configure()
 {
+#ifdef __APPLE__
+    // The reload runs on the next ResourceLoader update on Windows. macOS has no verified per-frame loader function
+    // (see RED4ext.SDK docs/re/resources.md, ResourceLoader_OnUpdate), so hot reload is not available.
+    LogWarning("ArchiveXL.Reload() is not supported on macOS.");
+#else
     std::unique_lock _(m_reloadMutex);
 
     if (!IsHooked<Raw::ResourceLoader::OnUpdate>())
@@ -86,4 +91,5 @@ void App::ExtensionService::Configure()
             Unhook<Raw::ResourceLoader::OnUpdate>();
         });
     }
+#endif
 }

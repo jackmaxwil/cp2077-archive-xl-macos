@@ -1,4 +1,5 @@
 #include "Extension.hpp"
+#include "Red/Common.hpp"
 #include "Red/CommunitySystem.hpp"
 
 namespace
@@ -20,6 +21,18 @@ Red::Handle<Red::worldStaticMeshNode> s_dummyNode;
 std::string_view App::WorldStreamingExtension::GetName()
 {
     return ExtensionName;
+}
+
+namespace
+{
+// The SDK layout of these node classes differs on macOS (CResource/worldNode tail padding). Only touch a field when the
+// compiled offset is where the game's RTTI puts it, so a stale SDK header disables the change instead of corrupting.
+bool IsDestructibleNodeLayoutValid()
+{
+    static const bool s_valid = RED_FIELD_MATCHES_RTTI(Red::worldInstancedDestructibleMeshNode,
+                                                       cookedInstanceTransforms);
+    return s_valid;
+}
 }
 
 bool App::WorldStreamingExtension::Load()
@@ -266,6 +279,13 @@ bool App::WorldStreamingExtension::PatchSector(Red::world::StreamingSector* aSec
             else if (nodeMutation.nodeType == InstancedDestructibleNodeType)
             {
                 auto* meshNode = Red::Cast<Red::worldInstancedDestructibleMeshNode>(nodeDefinition);
+                if (!IsDestructibleNodeLayoutValid())
+                {
+                    LogError("[{}] {}: worldInstancedDestructibleMeshNode layout mismatch, node #{} is not patched.",
+                             ExtensionName, aSectorMod.mod, nodeMutation.nodeIndex);
+                    nodeValidationPassed = false;
+                    continue;
+                }
                 if (meshNode->cookedInstanceTransforms.numElements != nodeMutation.expectedSubNodes)
                 {
                     LogError(R"([{}] {}: The target node #{} has {} instance(s), but the mod expects {}.)",
@@ -322,6 +342,13 @@ bool App::WorldStreamingExtension::PatchSector(Red::world::StreamingSector* aSec
             else if (nodeDeletion.nodeType == InstancedDestructibleNodeType)
             {
                 auto* meshNode = Red::Cast<Red::worldInstancedDestructibleMeshNode>(nodeDefinition);
+                if (!IsDestructibleNodeLayoutValid())
+                {
+                    LogError("[{}] {}: worldInstancedDestructibleMeshNode layout mismatch, node #{} is not patched.",
+                             ExtensionName, aSectorMod.mod, nodeDeletion.nodeIndex);
+                    nodeValidationPassed = false;
+                    continue;
+                }
                 if (meshNode->cookedInstanceTransforms.numElements != nodeDeletion.expectedSubNodes)
                 {
                     LogError(R"([{}] {}: The target node #{} has {} instance(s), but the mod expects {}.)",
@@ -435,7 +462,11 @@ bool App::WorldStreamingExtension::PatchSector(Red::world::StreamingSector* aSec
         {
             if (auto* spawnerDefinition = Red::Cast<Red::worldPopulationSpawnerNode>(nodeDefinition))
             {
-                spawnerDefinition->objectRecordId = nodeMutation.recordID;
+                static const bool s_layoutValid = RED_FIELD_MATCHES_RTTI(Red::worldPopulationSpawnerNode, objectRecordId);
+                if (s_layoutValid)
+                    spawnerDefinition->objectRecordId = nodeMutation.recordID;
+                else
+                    LogError("[{}] worldPopulationSpawnerNode layout mismatch, record change skipped.", ExtensionName);
             }
         }
 
@@ -443,7 +474,11 @@ bool App::WorldStreamingExtension::PatchSector(Red::world::StreamingSector* aSec
         {
             if (auto* proxyDefinition = Red::Cast<Red::worldPrefabProxyMeshNode>(nodeDefinition))
             {
-                proxyDefinition->nbNodesUnderProxy += nodeMutation.nbNodesUnderProxyDiff;
+                static const bool s_layoutValid = RED_FIELD_MATCHES_RTTI(Red::worldPrefabProxyMeshNode, nbNodesUnderProxy);
+                if (s_layoutValid)
+                    proxyDefinition->nbNodesUnderProxy += nodeMutation.nbNodesUnderProxyDiff;
+                else
+                    LogError("[{}] worldPrefabProxyMeshNode layout mismatch, proxy count change skipped.", ExtensionName);
             }
         }
 
@@ -628,7 +663,16 @@ void App::WorldStreamingExtension::OnRegisterSpots(Red::AIWorkspotManager* aMana
         auto newSize = allSpots->size + aNewSpots.size;
         if (allSpots->capacity < newSize)
         {
+#ifdef __APPLE__
+            if (!Raw::AISpotPersistentDataArray::Reserve(allSpots, newSize))
+            {
+                // RegisterSpots grows to new.size only; without the pre-reserve, appending would overflow.
+                LogError("[{}] Can't reserve workspot storage, mod spots are not registered.", ExtensionName);
+                return;
+            }
+#else
             Raw::AISpotPersistentDataArray::Reserve(allSpots, newSize);
+#endif
         }
 
         allSpots->flags |= static_cast<int32_t>(Red::SortedArray<Red::AISpotPersistentData>::Flags::NotSorted);

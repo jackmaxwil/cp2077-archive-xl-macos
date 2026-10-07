@@ -19,10 +19,16 @@ public:
     static void RegisterLink(Red::ResourcePath aPath, Red::ResourcePath aLink);
 
 private:
+#ifdef __APPLE__
+    static void OnLoaderResourceRequest(Red::ResourceLoader* aLoader, Red::ResourceRequest& aRequest);
+    static Raw::ResourceDepot::ResourceHandle OnDepotResourceRequest(Red::ResourceDepot* aDepot, Red::ResourcePath aPath,
+                                                                     const int32_t* aArchiveHandle);
+#else
     static void OnLoaderResourceRequest(Red::ResourceLoader* aLoader, Red::SharedPtr<Red::ResourceToken<>>& aToken,
                                         Red::ResourceRequest& aRequest);
     static uintptr_t* OnDepotResourceRequest(Red::ResourceDepot* aDepot, const uintptr_t* aResourceHandle,
                                              Red::ResourcePath aPath, const int32_t* aArchiveHandle);
+#endif
     static bool OnDepotResourceCheck(Red::ResourceDepot* aDepot, Red::ResourcePath aPath);
 
     inline static Core::Map<Red::ResourcePath, Red::ResourcePath> s_mappings;

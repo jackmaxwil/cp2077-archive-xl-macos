@@ -32,7 +32,11 @@ public:
     static PuppetFeetState GetFeetState(const Red::WeakHandle<Red::GameObject>& aPuppet);
 
 private:
+#ifdef __APPLE__
+    static void OnAttachPuppet(Red::gameuiCharacterCustomizationGenitalsController* aComponent, uintptr_t);
+#else
     static void OnAttachPuppet(Red::gameuiCharacterCustomizationGenitalsController* aComponent);
+#endif
     static void OnDetachPuppet(Red::gameuiCharacterCustomizationHairstyleController* aComponent, uintptr_t);
 
     static void CreateSuffixRecord(Red::TweakDBID aSuffixID, Red::CName aSystemName, Red::CName aFunctionName);

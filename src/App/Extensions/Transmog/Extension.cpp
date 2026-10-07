@@ -39,6 +39,12 @@ bool App::TransmogExtension::OnLoadTemplate(Red::ItemFactoryAppearanceChangeRequ
 {
     Red::ResourcePath originalPath;
 
+#ifdef __APPLE__
+    // macOS: +0x120 is a WeakHandle whose target type is not verified (LoadTemplate 0x1036FCA88 only checks that it
+    // locks), so it is not used as a factory index here; the template override is skipped (fail closed).
+    return Raw::ItemFactoryAppearanceChangeRequest::LoadTemplate(aRequest);
+#endif
+
     auto targetEntity = *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(aRequest) + ItemEntityOffset);
     auto visualRecord = *reinterpret_cast<Red::gamedataTweakDBRecord**>(aRequest + RecordOffset);
     auto entityFactory = *reinterpret_cast<uintptr_t*>(aRequest + FactoryOffset);
@@ -53,8 +59,12 @@ bool App::TransmogExtension::OnLoadTemplate(Red::ItemFactoryAppearanceChangeRequ
             auto factoryName = entityFlat->ToString();
 #endif
 
+#ifdef __APPLE__
+            const auto overridePath = Raw::FactoryIndex::ResolveResource(entityFactory, *entityFlat);
+#else
             Red::ResourcePath overridePath;
             Raw::FactoryIndex::ResolveResource(entityFactory, overridePath, *entityFlat);
+#endif
 
             if (overridePath)
             {
@@ -74,6 +84,55 @@ bool App::TransmogExtension::OnLoadTemplate(Red::ItemFactoryAppearanceChangeRequ
     return result;
 }
 
+#ifdef __APPLE__
+// macOS: the CName comes back in x0 and there is no out argument (see RED4ext.SDK docs/re/appearance.md).
+Red::CName App::TransmogExtension::OnSelectAppearance(const Red::Handle<Red::TweakDBRecord>& aItemRecord,
+                                                      const Red::ItemID& aItemID,
+                                                      const Red::Handle<Red::AppearanceResource>& aAppearanceResource,
+                                                      uint64_t a5, Red::CName aAppearanceName)
+{
+    if (!aAppearanceName && aItemRecord && aAppearanceResource)
+    {
+        if (auto name = FindRecordAppearance(aItemRecord, aAppearanceResource))
+            return name;
+    }
+
+    return Raw::AppearanceChanger::SelectAppearanceName(aItemRecord, aItemID, aAppearanceResource, a5,
+                                                        aAppearanceName);
+}
+#endif
+
+Red::CName App::TransmogExtension::FindRecordAppearance(const Red::Handle<Red::TweakDBRecord>& aItemRecord,
+                                                        const Red::Handle<Red::AppearanceResource>& aAppearanceResource)
+{
+    {
+        auto appearanceName = Red::GetFlatValue<Red::CName>({aItemRecord->recordID, ".appearanceName"});
+        if (appearanceName)
+        {
+            for (const auto& appearanceDefinition : aAppearanceResource->appearances)
+            {
+                if (appearanceDefinition->name == appearanceName)
+                    return appearanceName;
+            }
+        }
+    }
+    {
+        auto visualTags = Red::GetFlatPtr<Red::DynArray<Red::CName>>({aItemRecord->recordID, ".visualTags"});
+        if (visualTags && visualTags->size == 1)
+        {
+            auto& appearanceName = visualTags->entries[0];
+            for (const auto& appearanceDefinition : aAppearanceResource->appearances)
+            {
+                if (appearanceDefinition->name == appearanceName)
+                    return appearanceName;
+            }
+        }
+    }
+
+    return {};
+}
+
+#ifndef __APPLE__
 void* App::TransmogExtension::OnSelectAppearance(Red::CName* aOut,
                                                     const Red::Handle<Red::TweakDBRecord>& aItemRecord,
                                                     const Red::ItemID& aItemID,
@@ -116,3 +175,4 @@ void* App::TransmogExtension::OnSelectAppearance(Red::CName* aOut,
     return Raw::AppearanceChanger::SelectAppearanceName(aOut, aItemRecord, aItemID, aAppearanceResource,
                                                         a5, aAppearanceName);
 }
+#endif

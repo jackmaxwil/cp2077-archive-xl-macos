@@ -648,10 +648,27 @@ void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh
     Raw::MorphTargetMesh::PostLoad(aMorphTarget, aParams);
 }
 
+#ifdef __APPLE__
+void App::ResourcePatchExtension::OnEntityPackageLoad(Red::EntityBuilder* aBuilder, Red::JobQueue& aJobQueue)
+{
+    // macOS: the job params are built inside the hooked function from builder->self (WeakPtr at +0).
+    if (aBuilder)
+    {
+        DispatchEntityPackagePatches(aJobQueue, aBuilder->self);
+    }
+}
+#else
 void App::ResourcePatchExtension::OnEntityPackageLoad(Red::JobQueue& aJobQueue, void*,
                                                       Red::EntityBuilderJobParams* aParams)
 {
-    aJobQueue.Dispatch([entityBuilderWeak = aParams->entityBuilderWeak](const Red::JobGroup& aJobGroup) {
+    DispatchEntityPackagePatches(aJobQueue, aParams->entityBuilderWeak);
+}
+#endif
+
+void App::ResourcePatchExtension::DispatchEntityPackagePatches(Red::JobQueue& aJobQueue,
+                                                               const Red::WeakPtr<Red::EntityBuilder>& aBuilderWeak)
+{
+    aJobQueue.Dispatch([entityBuilderWeak = aBuilderWeak](const Red::JobGroup& aJobGroup) {
         if (entityBuilderWeak.Expired())
             return;
 
@@ -688,7 +705,7 @@ void App::ResourcePatchExtension::OnEntityPackageLoad(Red::JobQueue& aJobQueue, 
         }
     });
 
-    aJobQueue.Dispatch([entityBuilderWeak = aParams->entityBuilderWeak](const Red::JobGroup& aJobGroup) {
+    aJobQueue.Dispatch([entityBuilderWeak = aBuilderWeak](const Red::JobGroup& aJobGroup) {
         if (entityBuilderWeak.Expired())
             return;
 
@@ -740,6 +757,47 @@ void App::ResourcePatchExtension::OnPartPackageExtract(
     PatchPackageResults(aPartToken->resource, aResultObjects, false, true, false);
 }
 
+#ifdef __APPLE__
+void App::ResourcePatchExtension::OnGarmentPackageExtract(Red::GarmentExtractionParams* aParams,
+                                                          const Red::JobGroup& aJobGroup)
+{
+    // macOS: params+0 is a SharedPtr<ResourceToken<EntityTemplate>> (the job reads only its instance), not a Handle,
+    // so it is never overwritten. The job consumes its params synchronously (token, +0x20 SharedPtr with a new ref,
+    // +0x30..+0x3D by value; job 0x100AE6348), so each patch runs on a copy whose +0 is the patch token instead.
+    constexpr size_t ParamsSize = 0x40;
+
+    auto* partToken = *reinterpret_cast<Red::ResourceToken<Red::EntityTemplate>**>(aParams);
+    if (!partToken)
+        return;
+
+    const auto& patchList = GetPatchList(partToken->path);
+
+    if (patchList.empty())
+        return;
+
+    for (const auto& patchPath : patchList)
+    {
+        if (!GetPatchResource<Red::EntityTemplate>(patchPath))
+            continue;
+
+        const auto& patchConfig = GetPatchConfig(patchPath);
+
+        if (patchConfig->Modifies(EntityTemplateComponentsProp))
+        {
+            auto patchToken = GetPatchToken<Red::EntityTemplate>(patchPath);
+            if (!patchToken)
+                continue;
+
+            alignas(16) uint8_t paramsCopy[ParamsSize];
+            std::memcpy(paramsCopy, aParams, ParamsSize);
+            *reinterpret_cast<void**>(paramsCopy) = patchToken.instance;
+
+            Raw::GarmentAssembler::ExtractComponentsJob(reinterpret_cast<Red::GarmentExtractionParams*>(paramsCopy),
+                                                        aJobGroup);
+        }
+    }
+}
+#else
 void App::ResourcePatchExtension::OnGarmentPackageExtract(Red::GarmentExtractionParams* aParams,
                                                           const Red::JobGroup& aJobGroup)
 {
@@ -768,6 +826,7 @@ void App::ResourcePatchExtension::OnGarmentPackageExtract(Red::GarmentExtraction
 
     aParams->partTemplate = originalEntityTemplate;
 }
+#endif
 
 void App::ResourcePatchExtension::OnCurveSetResourceLoad(Red::CurveSet* aResource)
 {
@@ -851,7 +910,13 @@ void App::ResourcePatchExtension::OnSetPersistentStateData(uint64_t a1, Red::Dat
                                                            uint32_t a4)
 {
     auto streamingSystem = Red::GetRuntimeSystem<Red::worldRuntimeSystemWorldStreaming>();
+    if (!streamingSystem)
+        return;
+
+    // +0x270 is also the macOS offset: the game's getter 0x10341FDFC is `add x0, x0, #0x270`.
     auto& streamingWorld = Raw::RuntimeSystemWorldStreaming::StreamingWorld::Ref(streamingSystem);
+    if (!streamingWorld)
+        return;
 
     const auto& patchList = GetPatchList(streamingWorld->persistentStateData.path);
 

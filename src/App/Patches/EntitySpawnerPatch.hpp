@@ -15,7 +15,11 @@ class EntitySpawnerPatch
 protected:
     void OnBootstrap() override;
 
+#ifdef __APPLE__
+    static void OnSpawnEntity(void* aSpawner, Red::EntitySpawnerRequest* aRequest, Red::ResourcePath aTemplate);
+#else
     static void OnSpawnEntity(void* aSpawner, void* aOut, Red::EntitySpawnerRequest* aRequest,
                               Red::ResourcePath aTemplate);
+#endif
 };
 }

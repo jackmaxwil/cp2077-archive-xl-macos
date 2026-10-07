@@ -19,11 +19,25 @@ public:
     static Core::Set<Red::TweakDBID> GetRelatedSlots(Red::TweakDBID aBaseSlotID);
     static Core::Set<Red::TweakDBID> GetDependentSlots(Red::TweakDBID aBaseSlotID);
 
+    // The InnerSleeves ("itemsFactoryAppearanceSuffix.Partial") suffix value ArchiveXL forces for an item.
+    static const char* GetInnerSleevesSuffix(Red::Handle<Red::GameObject>& aOwner, const Red::ItemID& aItemID);
+#ifdef __APPLE__
+    static void ApplyInnerSleevesSuffix(Red::CString& aSuffixes, Red::Handle<Red::GameObject>& aOwner,
+                                        Red::TweakDBID aItemRecordID, const Red::ItemID& aItemID);
+#endif
+
 private:
     static void OnInitializeSlots(Red::game::AttachmentSlots* aComponent, Red::DynArray<Red::TweakDBID>& aSlotIDs);
     static bool OnSlotSpawningCheck(Red::game::AttachmentSlots* aComponent, Red::TweakDBID aSlotID);
     static void OnAttachTPP(Red::game::TPPRepresentationComponent* aComponent, uintptr_t);
     static void OnSlotCheckTPP(bool& aAffected, Red::TweakDBID aSlotID);
+#ifdef __APPLE__
+    static bool IsExtraAffectedSlotTPP(Red::TweakDBID aSlotID);
+    static void OnItemEquippedTPP(Red::game::TPPRepresentationComponent* aComponent, Red::TweakDBID aItemID,
+                                  Red::TweakDBID aSlotID);
+    static void OnItemUnequippedTPP(Red::game::TPPRepresentationComponent* aComponent, Red::TweakDBID aItemID,
+                                    Red::TweakDBID aSlotID);
+#endif
     // static void OnItemChangeTPP(Raw::TPPRepresentationComponent::SlotListenerCallback aCallback,
     //                             Red::game::TPPRepresentationComponent* aComponent,
     //                             Red::TweakDBID aItemID, Red::TweakDBID aSlotID);
@@ -35,9 +49,11 @@ private:
     static void OnCheckFeetState(Red::game::ui::CharacterCustomizationFeetController* aComponent,
                                  Red::CharacterBodyPartState& aLiftedState,
                                  Red::CharacterBodyPartState& aFlatState);
+#ifndef __APPLE__
     static bool OnGetSuffixValue(Raw::AppearanceChanger::GetSuffixValuePtr aOriginalFunc,
                                  const Red::ItemID& aItemID, uint64_t a2, Red::Handle<Red::GameObject>& aOwner,
                                  Red::TweakDBID aSuffixRecordID, Red::CString& aResult);
+#endif
 
     static bool IsVisualTagActive(Red::Handle<Red::Entity>& aOwner, Red::TweakDBID aBaseSlotID, Red::CName aVisualTag,
                                   Red::TweakDBID aEquippedItemID = {});

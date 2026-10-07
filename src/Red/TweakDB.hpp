@@ -45,6 +45,9 @@ inline void SetFlat(TweakDBID aFlatID, T&& aValue)
     auto tweakDB = TweakDB::Get();
 
     const auto type = GetType<T>();
+    if (!tweakDB || !type)
+        return;
+
     const auto offset = tweakDB->CreateFlatValue({type, &aValue});
 
     aFlatID.SetTDBOffset(offset);
@@ -60,6 +63,9 @@ inline TweakDBID CreateFlat(TweakDBID aFlatID, T&& aValue)
     auto tweakDB = TweakDB::Get();
 
     const auto type = GetType<T>();
+    if (!tweakDB || !type)
+        return {};
+
     const auto offset = tweakDB->CreateFlatValue({type, &aValue});
 
     aFlatID.SetTDBOffset(offset);
@@ -174,7 +180,11 @@ inline DynArray<Handle<R>> GetRecords()
 
     std::shared_lock _(tweakDB->mutex01);
 
-    auto* records = tweakDB->recordsByType.Get(GetType<R>());
+    const auto type = GetType<R>();
+    if (!type)
+        return {};
+
+    auto* records = tweakDB->recordsByType.Get(type);
 
     if (!records)
         return {};

@@ -110,6 +110,10 @@ constexpr uint32_t GarmentAssemblerState_AddCustomItem = 3128897273;
 constexpr uint32_t GarmentAssemblerState_ChangeItem = 3740082313;
 constexpr uint32_t GarmentAssemblerState_ChangeCustomItem = 956641309;
 
+// macOS: the state-level ChangeItem/ChangeCustomItem are inlined into these aggregator-level wrappers.
+constexpr uint32_t GarmentAssembler_ChangeItem = 1833321597;
+constexpr uint32_t GarmentAssembler_ChangeCustomItem = 3778698806;
+
 constexpr uint32_t ImpostorComponent_OnAttach = 4002093843;
 
 constexpr uint32_t InkSpawner_FinishAsyncSpawn = 2698985195;
@@ -145,6 +149,10 @@ constexpr uint32_t Localization_LoadLipsyncs = 1488657506;
 constexpr uint32_t MappinSystem_GetMappinData = 3299551353;
 constexpr uint32_t MappinSystem_GetPoiData = 620961393;
 constexpr uint32_t MappinSystem_OnStreamingWorldLoaded = 140387944;
+
+// macOS: the resource-level lookups that MappinSystem_GetMappinData/GetPoiData tail-call.
+constexpr uint32_t MappinResource_GetMappinData = 1231151050;
+constexpr uint32_t PointOfInterestMappinResource_GetMappinData = 3428782773;
 
 constexpr uint32_t MeshAppearance_LoadMaterialSetupAsync = 1419388740;
 
@@ -185,6 +193,7 @@ constexpr uint32_t TPPRepresentationComponent_OnItemEquipped = 4010810747;
 constexpr uint32_t TPPRepresentationComponent_OnItemUnequipped = 1933319146;
 constexpr uint32_t TPPRepresentationComponent_RegisterAffectedItem = 3037343626;
 constexpr uint32_t TPPRepresentationComponent_IsAffectedSlot = 678894266;
+constexpr uint32_t TPPRepresentationComponent_UnregisterAffectedItem = 4029647147;
 
 constexpr uint32_t TweakDB_Load = 3602585178; // game::data::TweakDB::LoadOptimized
 }

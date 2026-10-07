@@ -86,8 +86,16 @@ private:
     };
 
     static void OnFindAppearance(Red::Handle<Red::mesh::MeshAppearance>& aAppearance, Red::CMesh* aMesh, Red::CName aName);
+#ifdef __APPLE__
+    static Red::MeshMaterialsToken OnLoadMaterials(Red::CMesh* aTargetMesh,
+                                                   const Red::DynArray<Red::CName>& aMaterialNames, uint8_t a4);
+#endif
+    static void PatchLoadedMaterials(Red::CMesh* aTargetMesh, Red::MeshMaterialsToken& aToken,
+                                     const Red::DynArray<Red::CName>& aMaterialNames);
+#ifndef __APPLE__
     static void* OnLoadMaterials(Red::CMesh* aTargetMesh, Red::MeshMaterialsToken& aToken,
                                  const Red::DynArray<Red::CName>& aMaterialNames, uint8_t a4);
+#endif
     static void OnAddStubAppearance(Red::CMesh* aMesh);
     static bool OnPreloadAppearances(Red::CMesh* aMesh);
 
