@@ -46,19 +46,15 @@ target_include_directories(semver INTERFACE "${CMAKE_SOURCE_DIR}/vendor/semver/i
 # RED4ext.SDK (header-only)
 add_library(RED4ext.SDK INTERFACE)
 
-# Prefer a workspace checkout of RED4ext.SDK (for the macOS port) when available,
-# but keep the vendored SDK as a fallback for standalone builds.
-set(RED4EXT_SDK_VENDOR_DIR "${CMAKE_SOURCE_DIR}/vendor/RED4ext.SDK/include")
-set(RED4EXT_SDK_WORKSPACE_DIR "${CMAKE_SOURCE_DIR}/../RED4ext.SDK/include")
-
-if(EXISTS "${RED4EXT_SDK_WORKSPACE_DIR}/RED4ext/RED4ext.hpp")
-    message(STATUS "Using workspace RED4ext.SDK headers: ${RED4EXT_SDK_WORKSPACE_DIR}")
-    target_include_directories(RED4ext.SDK INTERFACE "${RED4EXT_SDK_WORKSPACE_DIR}")
-else()
-    message(STATUS "Using vendored RED4ext.SDK headers: ${RED4EXT_SDK_VENDOR_DIR}")
+# RED4ext.SDK headers. RED4EXT_SDK_DIR is the SDK repository root; it defaults to the pinned vendor/RED4ext.SDK
+# submodule. RED4ext's tools/cp-dev and scripts/create_release.sh pass the workspace checkout explicitly.
+set(RED4EXT_SDK_DIR "${CMAKE_SOURCE_DIR}/vendor/RED4ext.SDK" CACHE PATH "RED4ext.SDK repository root")
+if(NOT EXISTS "${RED4EXT_SDK_DIR}/include/RED4ext/RED4ext.hpp")
+    message(FATAL_ERROR "RED4ext.SDK not found at ${RED4EXT_SDK_DIR}. "
+                        "Run `git submodule update --init --recursive`, or pass -DRED4EXT_SDK_DIR=<path>.")
 endif()
-
-target_include_directories(RED4ext.SDK INTERFACE "${RED4EXT_SDK_VENDOR_DIR}")
+message(STATUS "RED4ext.SDK: ${RED4EXT_SDK_DIR}")
+target_include_directories(RED4ext.SDK INTERFACE "${RED4EXT_SDK_DIR}/include")
 
 # Platform-specific dependencies
 if(NOT APPLE)
