@@ -62,8 +62,13 @@ void App::ExtensionService::OnBootstrap()
 
 void App::ExtensionService::OnShutdown()
 {
-    m_loader->Unload();
-    m_loader = nullptr;
+    // Bootstrap can fail before the loader exists (e.g. a required address is unverified); shutdown must still be
+    // safe in that state.
+    if (m_loader)
+    {
+        m_loader->Unload();
+        m_loader = nullptr;
+    }
 }
 
 void App::ExtensionService::Configure()
