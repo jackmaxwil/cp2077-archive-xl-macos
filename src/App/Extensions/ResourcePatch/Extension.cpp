@@ -69,6 +69,9 @@ bool App::ResourcePatchExtension::Load()
 
 bool App::ResourcePatchExtension::Unload()
 {
+    LeakAtExit(s_patches);
+    LeakAtExit(s_patchTokens);
+
     Unhook<Raw::ResourceSerializer::Load>();
     Unhook<Raw::ResourceSerializer::Deserialize>();
     Unhook<Raw::ResourceSerializer::OnDependenciesReady>();

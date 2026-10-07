@@ -53,6 +53,8 @@ bool App::WorldStreamingExtension::Unload()
     Unhook<Raw::StreamingSector::PostLoad>();
     Unhook<Raw::AIWorkspotManager::RegisterSpots>();
 
+    LeakAtExit(s_dummyNode);
+
     return true;
 }
 

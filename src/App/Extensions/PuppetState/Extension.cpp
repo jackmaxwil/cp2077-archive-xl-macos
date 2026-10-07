@@ -27,6 +27,8 @@ bool App::PuppetStateExtension::Load()
 
 bool App::PuppetStateExtension::Unload()
 {
+    LeakAtExit(s_handlers);
+
     Unhook<Raw::CharacterCustomizationGenitalsController::OnAttach>();
     Unhook<Raw::CharacterCustomizationHairstyleController::OnDetach>();
 

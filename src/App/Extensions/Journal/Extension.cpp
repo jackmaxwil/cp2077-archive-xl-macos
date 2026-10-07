@@ -36,6 +36,8 @@ bool App::JournalExtension::Load()
 
 bool App::JournalExtension::Unload()
 {
+    LeakAtExit(s_resources);
+
     Unhook<Raw::JournalTree::ProcessJournalIndex>();
     Unhook<Raw::JournalRootFolderEntry::Initialize>();
     Unhook<Raw::MappinSystem::OnStreamingWorldLoaded>();

@@ -20,6 +20,19 @@ public:
     virtual void OnTweakDBReady() {}
 };
 
+// Unload runs while the process exits. Move a static that owns game objects (handles, resource tokens) into a heap
+// object that is never freed, so its static destructor does not call into the game, or resolve game addresses,
+// after the game has shut down. The process is ending; nothing is lost.
+template<typename T>
+inline void LeakAtExit(T& aStatic)
+{
+#ifdef __APPLE__
+    new T(std::move(aStatic));
+#else
+    aStatic = T{};
+#endif
+}
+
 class ConfigurableExtension : public Extension
 {
 public:

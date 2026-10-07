@@ -45,13 +45,18 @@ bool App::MeshExtension::Unload()
 {
     {
         std::unique_lock _(s_stateLock);
-        s_states.clear();
+        LeakAtExit(s_states);
     }
 
     Unhook<Raw::CMesh::FindAppearance>();
     Unhook<Raw::CMesh::LoadMaterialsAsync>();
     Unhook<Raw::CMesh::AddStubAppearance>();
     Unhook<Raw::CMesh::ShouldPreloadAppearances>();
+
+    LeakAtExit(s_dummyMesh);
+    LeakAtExit(s_dummyAppearance);
+    LeakAtExit(s_dummyMaterial);
+    LeakAtExit(s_tempMaterial);
 
     return true;
 }
