@@ -6,9 +6,9 @@
 # for the same version instead. Archives are platform-independent. The download is checked against pinned checksums.
 set -euo pipefail
 
-VERSION=1.26.1
-ZIP_SHA256=7cb3e7eeec9a8561fe0e8543a2d65c53cc4ec9921ee2b144b2968b3d2db9ddab
-ARCHIVE_SHA256=46390178f9a85c6c2348e0635d47d0565a5d9581e351150847dea5f3439484eb
+VERSION=1.27.4
+ZIP_SHA256=6c638dc1108a565ff4806835a17f704cbb2ab2afeb8ccf700080797c3f70591c
+ARCHIVE_SHA256=70b2967832555292712cc583753da4823113dc7a3f388030b45c6966909241d3
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/bundle/packed/archive/pc/mod/ArchiveXL.archive"
