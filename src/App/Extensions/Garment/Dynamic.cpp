@@ -840,6 +840,8 @@ App::DynamicAppearanceController::CustomizationData App::DynamicAppearanceContro
     Raw::CharacterCustomizationHelper::GetHairColor(data.hairColor, system->ref, data.isMale);
 #endif
 
+#ifndef __APPLE__
+    // macOS: the system's state handle offset (+0x78) is not verified, so nails color comes only from the components.
     if (!data.nailsColor)
     {
         auto state = Raw::CharacterCustomizationSystem::State::Ref(system);
@@ -864,6 +866,7 @@ App::DynamicAppearanceController::CustomizationData App::DynamicAppearanceContro
             }
         }
     }
+#endif
 
     return data;
 }

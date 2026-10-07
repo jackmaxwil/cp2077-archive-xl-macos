@@ -274,6 +274,18 @@ bool App::WorldStreamingExtension::PatchSector(Red::world::StreamingSector* aSec
                     nodeValidationPassed = false;
                     continue;
                 }
+#ifdef __APPLE__
+                // macOS: the collision node's shape and preset offsets (+0x48, +0x98) are not verified, so shape
+                // deletions are refused (fail closed); whole-actor deletions still apply.
+                if (std::ranges::any_of(nodeDeletion.elementDeletions,
+                                        [](const auto& aDeletion) { return aDeletion.subElementIndex >= 0; }))
+                {
+                    LogError("[{}] {}: Collision shape deletions are not supported on macOS, node #{} is not patched.",
+                             ExtensionName, aSectorMod.mod, nodeDeletion.nodeIndex);
+                    nodeValidationPassed = false;
+                    continue;
+                }
+#endif
                 if (!nodeDeletion.elementDeletions.empty())
                 {
                     auto& shapes = Raw::CollisionNode::Shapes::Ref(nodeDefinition);

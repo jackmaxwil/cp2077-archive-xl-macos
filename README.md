@@ -41,7 +41,9 @@ The `.xl` format is the same as on Windows; see the [upstream project](https://g
   instead (in name order, like the game does on Windows), so on macOS `.archive` mods need ArchiveXL even when they
   have no `.xl` file.
 - Also off on macOS: the Transmog factory template override, native registration of the two PuppetState enums, and the
-  WorldWidgetComponent limit patch. Their addresses or layouts are not verified on macOS.
+  WorldWidgetComponent limit patch, collision shape deletions in world streaming sectors (whole-actor deletions work),
+  and the nails color fallback read from the character customization state (the color still comes from the nails
+  component). Their addresses or layouts are not verified on macOS.
 
 ## Troubleshooting
 
