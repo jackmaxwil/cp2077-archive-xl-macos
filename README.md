@@ -8,8 +8,18 @@ address database.
 
 ## Install
 
-ArchiveXL comes with the RED4ext macOS release zip. Follow
-[RED4ext's INSTALL_MACOS.md](https://github.com/jackmaxwil/RED4ext-macos/blob/main/docs/INSTALL_MACOS.md).
+ArchiveXL is part of the RED4ext macOS release (Cyberpunk 2077 2.3.1, Steam, Apple silicon). Quit the game, open Terminal
+and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jackmaxwil/RED4ext-macos/main/install.sh | bash
+```
+
+That installs RED4ext with TweakXL, ArchiveXL and ModMenu. Update, uninstall, `doctor` and `play` are in
+[RED4ext's README](https://github.com/jackmaxwil/RED4ext-macos#install); the manual install is in
+[INSTALL_MACOS.md](https://github.com/jackmaxwil/RED4ext-macos/blob/main/docs/INSTALL_MACOS.md). Start the game with
+`launch_red4ext.sh` from the game folder; the Steam Play button starts it without mods.
+
 It installs to `red4ext/plugins/ArchiveXL/` in the game folder:
 
 ```
@@ -18,8 +28,6 @@ red4ext/plugins/ArchiveXL/
   Bundle/     ArchiveXL's own .xl files and ArchiveXL.archive
   Scripts/    ArchiveXL's REDscript sources
 ```
-
-Start the game with `launch_red4ext.sh` from the game folder. The Steam Play button starts the game without mods.
 
 ## Use it
 
