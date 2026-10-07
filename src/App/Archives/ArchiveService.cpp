@@ -1,6 +1,7 @@
 #include "ArchiveService.hpp"
 #include "Core/Facades/Runtime.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 
 namespace
@@ -21,6 +22,20 @@ App::ArchiveService::ArchiveService(std::filesystem::path aGameDir, std::filesys
     {
         RegisterDirectory(m_bundleDir);
     }
+
+#ifdef __APPLE__
+    // The macOS game builds no mod archive group, so archive/pc/mod (where mod managers and mod instructions put
+    // mods) is never read. Load it here like the bundle folder; the group it gets is a mod group, so the .xl files
+    // next to the archives are found too. ARCHIVEXL_MOD_DIR replaces the folder (used by tests).
+    const char* modDirOverride = std::getenv("ARCHIVEXL_MOD_DIR");
+    auto modDir = modDirOverride && *modDirOverride ? std::filesystem::path(modDirOverride)
+                                                    : m_gameDir / "archive" / "pc" / "mod";
+    std::error_code error;
+    if (std::filesystem::is_directory(modDir, error))
+    {
+        RegisterDirectory(modDir);
+    }
+#endif
 }
 
 void App::ArchiveService::OnBootstrap()
@@ -80,18 +95,28 @@ void App::ArchiveService::OnInitializeArchives(Red::ResourceDepot* aDepot)
             continue;
         }
 
-        Red::DynArray<Red::CString> archivePaths;
+        // Sorted by name: mods rely on the alphabetical load order (prefixes such as "!" and "#").
+        Core::Vector<std::filesystem::path> dirArchives;
 
         for (const auto& entry : dirIt)
         {
             if (entry.is_regular_file() && entry.path().extension() == L".archive")
             {
-                archivePaths.PushBack(entry.path().string());
+                dirArchives.push_back(entry.path());
+            }
+        }
 
-                if (archiveDir != m_bundleDir)
-                {
-                    loadedArchives.push_back(entry.path());
-                }
+        std::sort(dirArchives.begin(), dirArchives.end());
+
+        Red::DynArray<Red::CString> archivePaths;
+
+        for (const auto& archivePath : dirArchives)
+        {
+            archivePaths.PushBack(archivePath.string());
+
+            if (archiveDir != m_bundleDir)
+            {
+                loadedArchives.push_back(archivePath);
             }
         }
 

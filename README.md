@@ -39,9 +39,9 @@ The `.xl` format is the same as on Windows; see the [upstream project](https://g
   Restart the game to pick up changed `.xl` files.
 - At unload, static game handles are leaked on purpose (`LeakAtExit` in
   `src/App/Extensions/ExtensionBase.hpp`), because releasing them after the game has shut down crashed on exit.
-- **Known bug, being fixed:** `.xl` files in `archive/pc/mod/` are not loaded yet (the log shows
-  `Discovering archive extensions...` but no `Loading "<file>.xl"...` line for them). ArchiveXL's own bundled `.xl`
-  files do load. Until this is fixed, mods that rely on an `.archive.xl` file will not work.
+- The macOS game itself does not load mod archives: it never reads `archive/pc/mod/`. ArchiveXL loads that folder
+  instead (in name order, like the game does on Windows), so on macOS `.archive` mods need ArchiveXL even when they
+  have no `.xl` file.
 - Also off on macOS: the Transmog factory template override, native registration of the two PuppetState enums, and the
   WorldWidgetComponent limit patch. Their addresses or layouts are not verified on macOS.
 
@@ -55,8 +55,10 @@ The `.xl` format is the same as on Windows; see the [upstream project](https://g
   that the file is under `archive/pc/mod/` and ends in `.xl`. If it is listed with an error, the YAML is wrong.
 - **The game crashes.** Send the newest ArchiveXL log, the newest `red4ext/logs/red4ext-*.log` and the crash report from
   Console.app (Crash Reports, `Cyberpunk2077`).
-- **Debug output.** `ARCHIVEXL_ADDR_TRACE=1` logs every address lookup and `ARCHIVEXL_HOOK_TRACE=1` every hook
-  attach/detach, e.g. `ARCHIVEXL_HOOK_TRACE=1 ./launch_red4ext.sh`.
+- **A mod's `.archive` is not loaded.** The log lists every mod archive as `Archive "archive/pc/mod/<name>.archive"
+  loaded.` Archives must sit directly in `archive/pc/mod/`, not in a subfolder.
+- **Debug output.** `ARCHIVEXL_ADDR_TRACE=1` logs every address lookup, `ARCHIVEXL_HOOK_TRACE=1` every hook
+  attach/detach and `ARCHIVEXL_DEPOT_TRACE=1` the game's archive groups, e.g. `ARCHIVEXL_HOOK_TRACE=1 ./launch_red4ext.sh`.
 
 ## Build from source
 

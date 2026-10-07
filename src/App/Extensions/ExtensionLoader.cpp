@@ -1,4 +1,6 @@
 #include "ExtensionLoader.hpp"
+
+#include <cstdlib>
 #include "App/Utils/Str.hpp"
 
 App::ExtensionLoader::ExtensionLoader(std::filesystem::path aBundleDir, std::wstring aConfigExt)
@@ -25,6 +27,17 @@ void App::ExtensionLoader::Configure()
 
         {
             auto depot = Red::ResourceDepot::Get();
+
+            // ARCHIVEXL_DEPOT_TRACE=1: list the depot's archive groups (diagnoses where mod archives are found).
+            if (std::getenv("ARCHIVEXL_DEPOT_TRACE"))
+            {
+                for (const auto& group : depot->groups)
+                {
+                    LogInfo("[Depot] group scope={} basePath=\"{}\" archives={} first=\"{}\"",
+                            static_cast<uint32_t>(group.scope), group.basePath.c_str(), group.archives.size,
+                            group.archives.size > 0 ? group.archives[0].path.c_str() : "");
+                }
+            }
 
             for (const auto& group : depot->groups | std::views::reverse)
             {
