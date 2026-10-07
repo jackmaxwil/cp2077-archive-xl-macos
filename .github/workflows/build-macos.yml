@@ -1,0 +1,26 @@
+name: Build (macOS)
+
+on: [ push, pull_request ]
+
+jobs:
+  macos:
+    name: Build and address check (macOS arm64)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Dependencies
+        run: brew install spdlog yaml-cpp
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j
+
+      # Every game address the plugin uses must be verified in the RED4ext.SDK address database, or RED4ext refuses it.
+      - name: Address requirements
+        run: python3 vendor/RED4ext.SDK/scripts/plugin_requirements.py build/ArchiveXL.dylib
