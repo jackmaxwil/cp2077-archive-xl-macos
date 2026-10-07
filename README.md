@@ -9,7 +9,7 @@ address database.
 ## Install
 
 ArchiveXL comes with the RED4ext macOS release zip. Follow
-[RED4ext's INSTALL_MACOS.md](https://github.com/jackmaxwil/RED4ext-macos/blob/macos-port/docs/INSTALL_MACOS.md).
+[RED4ext's INSTALL_MACOS.md](https://github.com/jackmaxwil/RED4ext-macos/blob/main/docs/INSTALL_MACOS.md).
 It installs to `red4ext/plugins/ArchiveXL/` in the game folder:
 
 ```

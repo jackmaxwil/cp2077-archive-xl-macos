@@ -1,6 +1,6 @@
 # ArchiveXL macOS port: agent notes
 
-Fork of psiberx/cp2077-archive-xl (MIT), ported to Cyberpunk 2077 2.3.1 on macOS arm64. Branch `macos-port`.
+Fork of psiberx/cp2077-archive-xl (MIT), ported to Cyberpunk 2077 2.3.1 on macOS arm64. Branch `main`.
 It runs in game as a RED4ext plugin. Read `README.md` first.
 
 ## Rules
@@ -13,7 +13,7 @@ It runs in game as a RED4ext plugin. Read `README.md` first.
   `lib/Support/macOS/ArchiveXLAddressResolver.cpp` to the RED4ext.SDK address DB, and only entries marked verified
   resolve. Add or change addresses in RED4ext.SDK with evidence (its `docs/ADDRESS_AUDIT.md` and `docs/re/`), never
   here. If an address or layout cannot be verified, disable the feature on macOS (fail closed) and log it.
-- No Frida. Hooks go through `MacOSHookingProvider` to RED4ext's native hook engine.
+- Native hooks only. Hooks go through `MacOSHookingProvider` to RED4ext's native hook engine.
 - Hook callbacks must not throw. Keep `.OrThrow()` on required hooks so missing addresses show up at startup.
 - Do not launch the game or Steam from tooling.
 
