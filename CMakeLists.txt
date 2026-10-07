@@ -64,8 +64,25 @@ if(NOT APPLE)
 endif()
 
 # Find external packages (Homebrew/system)
-find_package(spdlog REQUIRED)
-find_package(yaml-cpp REQUIRED)
+# spdlog (with its bundled fmt) and yaml-cpp are built from pinned sources as static libraries, so the plugin needs
+# nothing from Homebrew on the player's Mac.
+include(FetchContent)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5) # yaml-cpp 0.8.0 declares an older CMake minimum
+set(SPDLOG_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(SPDLOG_FMT_EXTERNAL OFF CACHE BOOL "" FORCE)
+set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "" FORCE)
+set(YAML_CPP_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(spdlog
+    URL https://github.com/gabime/spdlog/archive/refs/tags/v1.16.0.tar.gz
+    URL_HASH SHA256=8741753e488a78dd0d0024c980e1fb5b5c85888447e309d9cb9d949bdb52aa3e)
+FetchContent_Declare(yaml-cpp
+    URL https://github.com/jbeder/yaml-cpp/archive/refs/tags/0.8.0.tar.gz
+    URL_HASH SHA256=fbe74bbdcee21d656715688706da3c8becfd946d92cd44705cc6098bb23b3a16)
+FetchContent_MakeAvailable(spdlog yaml-cpp)
 
 # Source files
 set(ARCHIVEXL_SOURCES

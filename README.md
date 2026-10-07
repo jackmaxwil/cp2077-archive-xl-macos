@@ -73,7 +73,7 @@ The `.xl` format is the same as on Windows; see the [upstream project](https://g
 Needs Xcode Command Line Tools and Homebrew packages:
 
 ```bash
-brew install cmake spdlog yaml-cpp
+brew install cmake
 git submodule update --init --recursive
 cmake -S . -B build-dev -DCMAKE_BUILD_TYPE=Release
 cmake --build build-dev -j8

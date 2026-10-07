@@ -12,8 +12,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Dependencies
-        run: brew install spdlog yaml-cpp
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -24,3 +22,9 @@ jobs:
       # Every game address the plugin uses must be verified in the RED4ext.SDK address database, or RED4ext refuses it.
       - name: Address requirements
         run: python3 vendor/RED4ext.SDK/scripts/plugin_requirements.py build/ArchiveXL.dylib
+
+      # Players' Macs have only the system libraries.
+      - name: Only system libraries
+        run: |
+          foreign=$(otool -L build/ArchiveXL.dylib | tail -n +2 | awk '{ print $1 }' | grep -v -e '^/usr/lib/' -e '^/System/' -e '^@rpath/ArchiveXL.dylib$' || true)
+          if [ -n "$foreign" ]; then echo "links libraries players don't have:"; echo "$foreign"; exit 1; fi
