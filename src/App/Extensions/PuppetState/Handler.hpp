@@ -99,6 +99,11 @@ private:
 };
 }
 
+#ifndef __APPLE__
+// macOS: not registered. A registered native enum instantiates the SDK's CEnum overrides, whose macOS signatures are
+// not verified (the game's CEnum::FromString takes a StringView by value in x2/x3, vtable 0x106FFC2B8 +0x78). Nothing
+// in ArchiveXL's scripts or RTTI properties uses these enums; their names come from RTTI_ENUM_NAME_STR at compile time.
 RTTI_DEFINE_ENUM(App::PuppetArmsState);
 RTTI_DEFINE_ENUM(App::PuppetFeetState);
+#endif
 RTTI_DEFINE_CLASS(App::PuppetStateHandler);
