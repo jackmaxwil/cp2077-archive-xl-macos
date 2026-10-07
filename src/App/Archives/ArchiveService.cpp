@@ -2,6 +2,7 @@
 #include "Core/Facades/Runtime.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 
 namespace
@@ -106,7 +107,16 @@ void App::ArchiveService::OnInitializeArchives(Red::ResourceDepot* aDepot)
             }
         }
 
-        std::sort(dirArchives.begin(), dirArchives.end());
+        // Windows lists a folder in case-insensitive order (names compared upper-cased), and when two archives contain
+        // the same file the first one wins; the macOS depot keeps the first one too (tested), so sort the same way.
+        std::sort(dirArchives.begin(), dirArchives.end(), [](const auto& aLeft, const auto& aRight) {
+            auto left = aLeft.filename().string();
+            auto right = aRight.filename().string();
+            auto upper = [](unsigned char aChar) { return static_cast<char>(std::toupper(aChar)); };
+            std::transform(left.begin(), left.end(), left.begin(), upper);
+            std::transform(right.begin(), right.end(), right.begin(), upper);
+            return left != right ? left < right : aLeft < aRight;
+        });
 
         Red::DynArray<Red::CString> archivePaths;
 
