@@ -8,12 +8,12 @@
 /bundle/*.zip
 /bundle/custom_refs.txt
 /bundle/fileTreeState.json
-/build
-/build-macos
+/build*/
 /dev
 .cursor/
 .DS_Store
 /src/App/Project.hpp
 /src/App/Version.rc
 /tools/wkit/layout.xml
-__pycache__
+__pycache__/
+*.log

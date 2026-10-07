@@ -1,55 +1,94 @@
-# ArchiveXL (macOS)
+# ArchiveXL for macOS
 
-Custom archive and resource loading for Cyberpunk 2077 on macOS ARM64.
-
-**Status:** Not loadable yet. Most of the game addresses ArchiveXL needs are still unverified, so RED4ext refuses to load it. See [docs/STATUS.md](docs/STATUS.md).
-
-## What it does
-
-ArchiveXL enables loading custom resources (archives, factories, localization, garments, animations, world streaming) without overwriting base game files. Built as a RED4ext `.dylib` plugin; its address hashes resolve through the SDK's canonical, verified-only address DB.
-
-## Prerequisites
-
-- RED4ext installed and functional
-- CMake 3.24+, Clang 15+
-
-## Build
-
-```bash
-mkdir build-macos && cd build-macos
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(sysctl -n hw.ncpu)
-```
+A port of [ArchiveXL](https://github.com/psiberx/cp2077-archive-xl) by psiberx to the native macOS version of
+Cyberpunk 2077 2.3.1 (Apple silicon, Steam). ArchiveXL is a RED4ext plugin that lets mods add and extend game
+resources (appearances, garments, localization, factories, world streaming, and more) through `.xl` files, without
+overwriting base game files. It runs in game on macOS; every game address it uses is verified in the RED4ext.SDK
+address database.
 
 ## Install
 
-```bash
-cp build-macos/ArchiveXL.dylib "<game>/red4ext/plugins/ArchiveXL/"
+ArchiveXL comes with the RED4ext macOS release zip. Follow
+[RED4ext's INSTALL_MACOS.md](https://github.com/jackmaxwil/RED4ext-macos/blob/macos-port/docs/INSTALL_MACOS.md).
+It installs to `red4ext/plugins/ArchiveXL/` in the game folder:
+
+```
+red4ext/plugins/ArchiveXL/
+  ArchiveXL.dylib
+  Bundle/     ArchiveXL's own .xl files (and .archive files, when included)
+  Scripts/    ArchiveXL's REDscript sources
 ```
 
-## Runtime validation
+Start the game with `launch_red4ext.sh` from the game folder. The Steam Play button starts the game without mods.
+
+## Use it
+
+Install ArchiveXL mods the same way as on Windows. ArchiveXL reads `.xl` files (YAML) from:
+
+- the game's mod archive folder, `archive/pc/mod/`, including subfolders. A mod usually ships `MyMod.archive` and
+  `MyMod.archive.xl` side by side.
+- its own `red4ext/plugins/ArchiveXL/Bundle/` folder. Leave this one alone.
+
+The `.xl` format is the same as on Windows; see the [upstream project](https://github.com/psiberx/cp2077-archive-xl).
+
+## Known gaps on macOS
+
+- The packed `ArchiveXL.archive` (built with WolvenKit) is not included yet. Its built-in character-customization
+  fixes log "not ready", "points to a non-existent resource" and "doesn't exist" errors. These errors are expected.
+- Hot reload (`ArchiveXL.Reload()`) is disabled. It logs `ArchiveXL.Reload() is not supported on macOS.`
+  Restart the game to pick up changed `.xl` files.
+- At unload, static game handles are leaked on purpose (`LeakAtExit` in
+  `src/App/Extensions/ExtensionBase.hpp`), because releasing them after the game has shut down crashed on exit.
+- **Known bug, being fixed:** `.xl` files in `archive/pc/mod/` are not loaded yet (the log shows
+  `Discovering archive extensions...` but no `Loading "<file>.xl"...` line for them). ArchiveXL's own bundled `.xl`
+  files do load. Until this is fixed, mods that rely on an `.archive.xl` file will not work.
+- Also off on macOS: the Transmog factory template override, native registration of the two PuppetState enums, and the
+  WorldWidgetComponent limit patch. Their addresses or layouts are not verified on macOS.
+
+## Troubleshooting
+
+- **Where is the log?** `red4ext/plugins/ArchiveXL/ArchiveXL-<date>-<time>.log`. RED4ext's own log is
+  `red4ext/logs/red4ext-*.log`.
+- **ArchiveXL does not load at all.** Read `red4ext/logs/red4ext-*.log`; it names a refused plugin and the reason.
+  On any game build other than 2.3.1, RED4ext refuses to hook anything.
+- **A mod's `.xl` file has no effect.** Look for `Loading "<file>.xl"...` in the ArchiveXL log. If it is missing, check
+  that the file is under `archive/pc/mod/` and ends in `.xl`. If it is listed with an error, the YAML is wrong.
+- **The game crashes.** Send the newest ArchiveXL log, the newest `red4ext/logs/red4ext-*.log` and the crash report from
+  Console.app (Crash Reports, `Cyberpunk2077`).
+- **Debug output.** `ARCHIVEXL_ADDR_TRACE=1` logs every address lookup and `ARCHIVEXL_HOOK_TRACE=1` every hook
+  attach/detach, e.g. `ARCHIVEXL_HOOK_TRACE=1 ./launch_red4ext.sh`.
+
+## Build from source
+
+Needs Xcode Command Line Tools and Homebrew packages:
 
 ```bash
-ARCHIVEXL_ADDR_TRACE=1 ARCHIVEXL_HOOK_TRACE=1 ./launch_red4ext.sh
+brew install cmake spdlog yaml-cpp
+git submodule update --init --recursive
+cmake -S . -B build-dev -DCMAKE_BUILD_TYPE=Release
+cmake --build build-dev -j8
 ```
 
-## Key files
+Output: `build-dev/ArchiveXL.dylib`. If `../RED4ext.SDK` exists (the workspace layout used for the port), its headers
+are used; otherwise the `vendor/RED4ext.SDK` submodule is. To build and install ArchiveXL together with RED4ext, use
+RED4ext's `tools/cp-dev` or `scripts/create_release.sh`. The upstream `xmake.lua` is kept for Windows builds.
 
-| File | Purpose |
-|------|---------|
-| `lib/Support/macOS/ArchiveXLAddressResolver.cpp` | Forwards hashes to the SDK's verified-only resolver |
-| `src/Red/Addresses/Library.hpp` | Hash constant definitions |
-| `tools/macos_discover_archivexl_offsets.py` | Address discovery tool |
-| `docs/STATUS.md` | Port status |
+## macOS changes
 
-## Related projects
+- Hooks attach through RED4ext's native macOS hook engine (`lib/Support/macOS/MacOSHookingProvider.hpp`) instead of
+  MinHook.
+- Every address hash resolves through the RED4ext.SDK address database
+  (`lib/Support/macOS/ArchiveXLAddressResolver.cpp`). Only verified entries resolve; anything else fails closed.
+- arm64 ABI: struct results returned through x8 are declared as by-value returns, and virtual function offsets shift
+  by 8 for the Itanium destructor pair.
+- Functions the macOS game inlines are hooked at their callers or rebuilt in code (garment ChangeItem, TPP slot checks,
+  GetSuffixValue, GetHairColor, mappin getters, and others).
+- Writes to classes whose layout differs on macOS are checked against the game's RTTI offsets and skipped on a
+  mismatch.
+- The game root is found three levels above the executable (inside `Cyberpunk2077.app`).
+- Built with CMake (`CMakeLists.txt`); macOS code is behind `#ifdef __APPLE__` so the fork stays rebaseable on upstream.
 
-| Project | Description |
-|---------|-------------|
-| [RED4ext](../RED4ext) | Required mod loader |
-| [RED4ext.SDK](../RED4ext.SDK) | SDK dependency |
-| [TweakXL](../cp2077-tweak-xl) | Companion tweak plugin |
+## Credits
 
-## Attribution
-
-Forked from [psiberx/cp2077-archive-xl](https://github.com/psiberx/cp2077-archive-xl). macOS port by memaxo.
+ArchiveXL is by [psiberx](https://github.com/psiberx), MIT license (see `LICENSE` and `THIRD_PARTY_LICENSES`). The
+macOS port keeps the upstream license.
