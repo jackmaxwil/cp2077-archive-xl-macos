@@ -99,13 +99,11 @@ void Support::SpdlogProvider::LogInfo(const std::string_view& aMessage)
 #if !defined(_WIN32) && !defined(_WIN64)
     {
         std::scoped_lock _{m_logMutex};
-        if (!m_resolvedLogPath.empty())
+        if (OpenLog())
         {
-            std::ofstream f(m_resolvedLogPath, std::ios::app);
-            f << "[INFO] " << aMessage << "\n";
+            m_logFile << "[INFO] " << aMessage << '\n';
         }
     }
-    std::cerr << "[ArchiveXL INFO] " << aMessage << std::endl;
 #else
     spdlog::default_logger_raw()->info(aMessage);
 #endif
@@ -116,13 +114,12 @@ void Support::SpdlogProvider::LogWarning(const std::string_view& aMessage)
 #if !defined(_WIN32) && !defined(_WIN64)
     {
         std::scoped_lock _{m_logMutex};
-        if (!m_resolvedLogPath.empty())
+        if (OpenLog())
         {
-            std::ofstream f(m_resolvedLogPath, std::ios::app);
-            f << "[WARN] " << aMessage << "\n";
+            m_logFile << "[WARN] " << aMessage << '\n';
+            m_logFile.flush();
         }
     }
-    std::cerr << "[ArchiveXL WARN] " << aMessage << std::endl;
 #else
     spdlog::default_logger_raw()->warn(aMessage);
 #endif
@@ -133,13 +130,12 @@ void Support::SpdlogProvider::LogError(const std::string_view& aMessage)
 #if !defined(_WIN32) && !defined(_WIN64)
     {
         std::scoped_lock _{m_logMutex};
-        if (!m_resolvedLogPath.empty())
+        if (OpenLog())
         {
-            std::ofstream f(m_resolvedLogPath, std::ios::app);
-            f << "[ERROR] " << aMessage << "\n";
+            m_logFile << "[ERROR] " << aMessage << '\n';
+            m_logFile.flush();
         }
     }
-    std::cerr << "[ArchiveXL ERROR] " << aMessage << std::endl;
 #else
     spdlog::default_logger_raw()->error(aMessage);
 #endif
@@ -150,13 +146,11 @@ void Support::SpdlogProvider::LogDebug(const std::string_view& aMessage)
 #if !defined(_WIN32) && !defined(_WIN64)
     {
         std::scoped_lock _{m_logMutex};
-        if (!m_resolvedLogPath.empty())
+        if (OpenLog())
         {
-            std::ofstream f(m_resolvedLogPath, std::ios::app);
-            f << "[DEBUG] " << aMessage << "\n";
+            m_logFile << "[DEBUG] " << aMessage << '\n';
         }
     }
-    std::cerr << "[ArchiveXL DEBUG] " << aMessage << std::endl;
 #else
     spdlog::default_logger_raw()->debug(aMessage);
 #endif
@@ -166,5 +160,16 @@ void Support::SpdlogProvider::LogFlush()
 {
 #if defined(_WIN32) || defined(_WIN64)
     spdlog::default_logger_raw()->flush();
+#else
+    std::scoped_lock _{m_logMutex};
+    if (m_logFile.is_open())
+        m_logFile.flush();
 #endif
+}
+
+bool Support::SpdlogProvider::OpenLog()
+{
+    if (!m_logFile.is_open() && !m_resolvedLogPath.empty())
+        m_logFile.open(m_resolvedLogPath, std::ios::app);
+    return m_logFile.is_open();
 }

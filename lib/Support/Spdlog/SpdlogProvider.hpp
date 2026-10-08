@@ -3,6 +3,7 @@
 #include "Core/Foundation/Feature.hpp"
 #include "Core/Logging/LoggingDriver.hpp"
 
+#include <fstream>
 #include <mutex>
 
 namespace Support
@@ -17,6 +18,14 @@ public:
     void LogError(const std::string_view& aMessage) override;
     void LogDebug(const std::string_view& aMessage) override;
     void LogFlush() override;
+
+protected:
+    void OnShutdown() override
+    {
+        LogFlush();
+    }
+
+public:
 
     auto SetLogPath(const std::filesystem::path& aPath) noexcept
     {
@@ -60,6 +69,10 @@ protected:
     std::filesystem::path m_baseLogPath;
     std::filesystem::path m_resolvedLogPath;
     std::mutex m_logMutex;
+    // Kept open and buffered: opening the file and echoing to the terminal for every line stalled the game thread
+    // (ArchiveXL logs thousands of lines while meshes stream in). Flushed on warnings, errors and shutdown.
+    std::ofstream m_logFile;
+    bool OpenLog();
     bool m_appendTimestamp{ false };
     bool m_recentSymlink{ false };
     int32_t m_maxLogCount{ 10 };
