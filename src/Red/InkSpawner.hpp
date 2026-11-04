@@ -29,6 +29,17 @@ struct InkSpawningRequest
 RED4EXT_ASSERT_OFFSET(InkSpawningRequest, itemName, 0x48);
 RED4EXT_ASSERT_OFFSET(InkSpawningRequest, rootWidget, 0x60);
 
+#ifdef __APPLE__
+// macOS 2.5.0: the context is a vtable-less 0x20-byte functor block. FinishAsyncSpawn 0x104368F34 copies the request
+// SharedPtr with `ldr q0, [x19, #0x10]`, where 2.3.1 read the request at +0x18 (RED4ext.SDK docs/re/port_2.5.0.md).
+struct InkSpawningContext
+{
+    uint8_t unk00[0x10];                   // 00 - weak handle
+    SharedPtr<InkSpawningRequest> request; // 10
+};
+RED4EXT_ASSERT_SIZE(InkSpawningContext, 0x20);
+RED4EXT_ASSERT_OFFSET(InkSpawningContext, request, 0x10);
+#else
 struct InkSpawningContext
 {
     virtual void sub_00() = 0;
@@ -43,6 +54,7 @@ struct InkSpawningContext
 };
 RED4EXT_ASSERT_SIZE(InkSpawningContext, 0x28);
 RED4EXT_ASSERT_OFFSET(InkSpawningContext, request, 0x18);
+#endif
 
 #ifdef __APPLE__
 // macOS: the context pointer is at +0x18 (see RED4ext.SDK docs/re/world.md). The size is not known; ArchiveXL only
