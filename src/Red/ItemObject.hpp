@@ -11,7 +11,7 @@ constexpr auto GetAppearanceName = Core::RawVFunc<
     /* type = */ Red::CName (Red::ItemObject::*)()>();
 #else
 constexpr auto GetAppearanceName = Core::RawVFunc<
-    /* offset = */ 0x280,
+    /* offset = */ 0x288,
     /* type = */ Red::CName* (Red::ItemObject::*)(Red::CName& aOut)>();
 #endif
 

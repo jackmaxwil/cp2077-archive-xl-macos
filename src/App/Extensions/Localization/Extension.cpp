@@ -95,14 +95,18 @@ void App::LocalizationExtension::OnLoadTexts(Red::Handle<TextResource>& aOnScree
 
             if (paths != unit.onscreens.end())
             {
-                // LogInfo(R"([{}] Processing "{}"...)", ExtensionName, unit.name);
+                // LogDebug(R"([{}] Processing "{}"...)", ExtensionName, unit.name);
             }
             else
             {
                 fallback = true;
                 paths = unit.onscreens.find(unit.fallback);
-                // LogInfo(R"([{}] Processing "{}" using fallback language "{}"...)",
-                //         ExtensionName, unit.name, unit.fallback.ToString());
+
+                if (paths == unit.onscreens.end())
+                    continue;
+
+                // LogDebug(R"([{}] Processing "{}" using fallback language "{}"...)",
+                //          ExtensionName, unit.name, unit.fallback.ToString());
             }
 
             for (const auto& path : paths->second)
@@ -220,11 +224,11 @@ void App::LocalizationExtension::MergeTextEntry(TextEntryList& aFinalList, TextE
         if (!aExtraEntry)
         {
             if (originalEntry->secondaryKey.Length() == 0)
-                LogWarning("[{}] Item #{} overwrites entry {}.",
-                           ExtensionName, aIndex, originalEntry->primaryKey);
+                LogDebug("[{}] Item #{} overwrites entry {}.",
+                         ExtensionName, aIndex, originalEntry->primaryKey);
             else
-                LogWarning("[{}] Item #{} overwrites entry {} (\"{}\").",
-                           ExtensionName, aIndex, originalEntry->primaryKey, originalEntry->secondaryKey.c_str());
+                LogDebug("[{}] Item #{} overwrites entry {} (\"{}\").",
+                         ExtensionName, aIndex, originalEntry->primaryKey, originalEntry->secondaryKey.c_str());
         }
 
         *originalEntry = aNewEntry;
@@ -280,14 +284,18 @@ void App::LocalizationExtension::OnLoadSubtitles(Red::Handle<SubtitleResource>& 
 
             if (paths != unit.subtitles.end())
             {
-                // LogInfo("[{}] Processing \"{}\"...", ExtensionName, unit.name);
+                // LogDebug("[{}] Processing \"{}\"...", ExtensionName, unit.name);
             }
             else
             {
                 fallback = true;
                 paths = unit.subtitles.find(unit.fallback);
-                // LogInfo(R"([{}] Processing "{}" using fallback language "{}"...)",
-                //         ExtensionName, unit.name, unit.fallback.ToString());
+
+                if (paths == unit.subtitles.end())
+                    continue;
+
+                // LogDebug(R"([{}] Processing "{}" using fallback language "{}"...)",
+                //          ExtensionName, unit.name, unit.fallback.ToString());
             }
 
             for (const auto& path : paths->second)

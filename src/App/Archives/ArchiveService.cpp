@@ -64,7 +64,7 @@ void LoadArchives(Red::ArchiveGroup& aGroup, const Red::DynArray<Red::CString>& 
     Raw::ResourceDepot::LoadArchives(nullptr, aGroup, aArchivePaths, aLoadedResources, false,
                                      Raw::ResourceDepot::LoadArchivesExitCode);
 #else
-    Raw::ResourceDepot::LoadArchives(nullptr, aGroup, aArchivePaths, aLoadedResources, false);
+    Raw::ResourceDepot::LoadArchives(nullptr, aGroup, aArchivePaths, aLoadedResources, 0, 2);
 #endif
 }
 }

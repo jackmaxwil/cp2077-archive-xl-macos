@@ -4,7 +4,7 @@ void App::WorldWidgetLimitPatch::OnBootstrap()
 {
 #if defined(_WIN32) || defined(_WIN64)
     auto& code = Core::RawPtr<Red::AddressLib::InkWorldLayer_UpdateComponents, uint8_t[0x100]>::Ref();
-    uint8_t op[] = {0x83, 0xFB, 0x0A, 0x73, 0x16};
+    uint8_t op[] = {0x83, 0xFB, 0x0A, 0x73}; // cmp ebx, 10; jae (rel8 differs per patch)
     bool success = false;
 
     DWORD oldProtect = 0;

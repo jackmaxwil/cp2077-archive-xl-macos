@@ -46,6 +46,7 @@ bool App::AttachmentExtension::Load()
     // macOS: GetSuffixValue is inlined into GetSuffixes; see ApplyInnerSleevesSuffix.
     HookWrap<Raw::AppearanceChanger::GetSuffixValue>(&OnGetSuffixValue).OrThrow();
 #endif
+    Hook<Raw::AttachmentSlots::UpdateWithExclusiveLock>(&OnUpdateWithExclusiveLock).OrThrow();
 
     {
         std::unique_lock _(s_slotsMutex);
@@ -73,6 +74,7 @@ bool App::AttachmentExtension::Unload()
 #ifndef __APPLE__
     Unhook<Raw::AppearanceChanger::GetSuffixValue>();
 #endif
+    Unhook<Raw::AttachmentSlots::UpdateWithExclusiveLock>();
 
     return true;
 }
@@ -347,10 +349,10 @@ void App::AttachmentExtension::OnCheckFeetState(Red::game::ui::CharacterCustomiz
 bool App::AttachmentExtension::OnGetSuffixValue(Raw::AppearanceChanger::GetSuffixValuePtr aOriginalFunc,
                                                 const Red::ItemID& aItemID, uint64_t a2,
                                                 Red::Handle<Red::GameObject>& aOwner,
-                                                Red::TweakDBID aSuffixRecordID,
+                                                const Red::TweakDBID& aSuffixRecordID,
                                                 Red::CString& aResult)
 {
-    if (aOwner && a2 && aSuffixRecordID == InnerSleevesSuffix)
+    if (aOwner && a2 && aSuffixRecordID == InnerSleevesSuffix && !s_skipVisualTagCheck)
     {
         aResult = IsVisualTagActive(aOwner, TorsoSlot, HideInnerSleevesTag, aItemID.tdbid)
                       ? HideInnerSleevesSuffixValue
@@ -361,6 +363,15 @@ bool App::AttachmentExtension::OnGetSuffixValue(Raw::AppearanceChanger::GetSuffi
     return aOriginalFunc(aItemID, a2, aOwner, aSuffixRecordID, aResult);
 }
 #endif
+
+void* App::AttachmentExtension::OnUpdateWithExclusiveLock(void* a1, void* a2, void* a3, void* a4)
+{
+    const auto previous = s_skipVisualTagCheck;
+    s_skipVisualTagCheck = true;
+    const auto result = Raw::AttachmentSlots::UpdateWithExclusiveLock(a1, a2, a3, a4);
+    s_skipVisualTagCheck = previous;
+    return result;
+}
 
 bool App::AttachmentExtension::IsVisualTagActive(Red::Handle<Red::Entity>& aOwner,
                                                  Red::TweakDBID aBaseSlotID, Red::CName aVisualTag,

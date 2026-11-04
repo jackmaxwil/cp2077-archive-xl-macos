@@ -68,13 +68,14 @@ void Support::SpdlogProvider::OnInitialize()
     m_resolvedLogPath = logPath;
 
 #if defined(_WIN32) || defined(_WIN64)
+    auto level = m_debugOutput ? spdlog::level::trace : spdlog::level::info;
     auto sink = Core::MakeShared<spdlog::sinks::rotating_file_sink_mt>(logPath.string(), m_maxPartSize, m_maxPartCount);
     auto logger = Core::MakeShared<spdlog::logger>("", spdlog::sinks_init_list{sink});
     logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%t] [%l] %v");
-    logger->flush_on(spdlog::level::trace);
+    logger->flush_on(level);
 
     spdlog::set_default_logger(logger);
-    spdlog::set_level(spdlog::level::trace);
+    spdlog::set_level(level);
 #else
     // macOS: avoid spdlog runtime issues during early injection; write to file manually.
     // Ensure the log file exists early so users can tail it even if later steps crash.

@@ -204,5 +204,5 @@ namespace Raw
 {
 constexpr auto LoadTweakDB = Core::RawFunc<
     /* addr = */ Red::AddressLib::TweakDB_Load,
-    /* type = */ void (*)(Red::TweakDB*, Red::CString&)>();
+    /* type = */ void (*)(Red::TweakDB*, bool, Red::CString&)>();
 }

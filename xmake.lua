@@ -1,26 +1,31 @@
 set_xmakever("2.5.9")
 
 set_project("ArchiveXL")
-set_version("1.27.3", {build = "%y%m%d%H%M"})
+set_version("1.28.7", {build = "%y%m%d%H%M"})
 
 set_arch("x64")
-set_languages("cxx2a")
-add_cxxflags("/MP /GR- /EHsc")
+set_languages("cxx20")
+add_cxxflags("/MP /GR- /EHsc /Zi")
 
 if is_mode("debug") then
-    set_symbols("debug")
     set_optimize("none")
-    add_cxxflags("/Od /Ob0 /Zi /RTC1")
+    set_symbols("debug")
+    set_strip("none")
+    add_cxxflags("/Od /Ob0 /RTC1")
 elseif is_mode("release") then
-    set_symbols("hidden")
-    set_strip("all")
     set_optimize("fastest")
-    add_cxxflags("/Ob2")
-elseif is_mode("releasedbg") then
     set_symbols("debug")
     set_strip("all")
+    add_cxxflags("/Ob2 /Gy")
+    add_ldflags("/DEBUG:FULL")
+    add_ldflags("/INCREMENTAL:NO")
+    add_ldflags("/OPT:REF")
+    add_ldflags("/OPT:ICF")
+elseif is_mode("releasedbg") then
     set_optimize("fastest")
-    add_cxxflags("/Ob1 /Zi")
+    set_symbols("debug")
+    set_strip("all")
+    add_cxxflags("/Ob1")
 end
 
 if is_mode("debug") then
@@ -30,6 +35,7 @@ else
 end
 
 add_requires("hopscotch-map", "minhook", "spdlog", "tiltedcore", "yaml-cpp")
+add_requireconfs("tiltedcore.mimalloc", {version = "2.x", override = true}) -- mimalloc 3.x dropped mi_malloc_size used by TiltedCore
 
 target("ArchiveXL")
     set_default(true)

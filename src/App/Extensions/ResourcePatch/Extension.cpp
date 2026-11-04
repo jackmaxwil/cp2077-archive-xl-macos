@@ -85,6 +85,10 @@ bool App::ResourcePatchExtension::Unload()
     Unhook<Raw::GarmentAssembler::ExtractComponentsJob>();
     Unhook<Raw::PersistencySystem::SetPersistentStateData>();
 
+    s_patches.clear();
+    s_targetPatches.clear();
+    s_dynamicPatches.clear();
+
     return true;
 }
 
@@ -292,14 +296,14 @@ void App::ResourcePatchExtension::OnEntityTemplateLoad(Red::EntityTemplate* aTem
                 {
                     aTemplate->appearances.EmplaceBack(patchAppearance);
 
-                    LogInfo(R"([{}] Appearance "{}" from "{}" added to "{}".)",
-                            ExtensionName, patchAppearance.name.ToString(), patchPathStr, targetPathStr);
+                    LogDebug(R"([{}] Appearance "{}" from "{}" added to "{}".)",
+                             ExtensionName, patchAppearance.name.ToString(), patchPathStr, targetPathStr);
                 }
                 else
                 {
-                    LogInfo(R"([{}] Appearance "{}" from "{}" replaced appearance "{}" of "{}".)",
-                            ExtensionName, patchAppearance.name.ToString(), patchPathStr,
-                            patchAppearance.name.ToString(), targetPathStr);
+                    LogDebug(R"([{}] Appearance "{}" from "{}" replaced appearance "{}" of "{}".)",
+                             ExtensionName, patchAppearance.name.ToString(), patchPathStr,
+                             patchAppearance.name.ToString(), targetPathStr);
                 }
             }
         }
@@ -327,8 +331,8 @@ void App::ResourcePatchExtension::OnEntityTemplateLoad(Red::EntityTemplate* aTem
                 {
                     aTemplate->resolvedDependencies.PushBack(dependency);
 
-                    LogInfo(R"([{}] Dependency "{}" from "{}" added to "{}".)",
-                            ExtensionName, dependencyPathStr, patchPathStr, targetPathStr);
+                    LogDebug(R"([{}] Dependency "{}" from "{}" added to "{}".)",
+                             ExtensionName, dependencyPathStr, patchPathStr, targetPathStr);
                 }
             }
         }
@@ -343,7 +347,7 @@ void App::ResourcePatchExtension::OnEntityTemplateLoad(Red::EntityTemplate* aTem
 
             aTemplate->visualTagsSchema->visualTags.Add(patchResource->visualTagsSchema->visualTags);
 
-            LogInfo(R"([{}] Visual tags from "{}" merged into "{}".)", ExtensionName, patchPathStr, targetPathStr);
+            LogDebug(R"([{}] Visual tags from "{}" merged into "{}".)", ExtensionName, patchPathStr, targetPathStr);
         }
     }
 }
@@ -423,9 +427,9 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                             {
                                 existingDefinition->partsValues.PushBack(partValue);
 
-                                LogInfo(R"([{}] Part resource "{}" from "{}" of "{}" added to "{}" of "{}".)",
-                                        ExtensionName, partPathStr, patchDefinition->name.ToString(), patchPathStr,
-                                        existingDefinition->name.ToString(), targetPathStr);
+                                LogDebug(R"([{}] Part resource "{}" from "{}" of "{}" added to "{}" of "{}".)",
+                                         ExtensionName, partPathStr, patchDefinition->name.ToString(), patchPathStr,
+                                         existingDefinition->name.ToString(), targetPathStr);
                             }
                         }
                     }
@@ -438,9 +442,9 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                             existingDefinition->partsOverrides.PushBack(partOverride);
                         }
 
-                        LogInfo(R"([{}] Parts overrides from "{}" of "{}" added to "{}" of "{}".)",
-                            ExtensionName, patchDefinition->name.ToString(), patchPathStr,
-                            existingDefinition->name.ToString(), targetPathStr);
+                        LogDebug(R"([{}] Parts overrides from "{}" of "{}" added to "{}" of "{}".)",
+                                 ExtensionName, patchDefinition->name.ToString(), patchPathStr,
+                                 existingDefinition->name.ToString(), targetPathStr);
                     }
 
                     if (patchInstance->Modifies(AppearanceResourceDependenciesProp))
@@ -467,9 +471,9 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                             {
                                 existingDefinition->resolvedDependencies.PushBack(dependency);
 
-                                LogInfo(R"([{}] Dependency "{}" from "{}" of "{}" added to "{}" of "{}".)",
-                                    ExtensionName, dependencyPathStr, patchDefinition->name.ToString(), patchPathStr,
-                                    existingDefinition->name.ToString(), targetPathStr);
+                                LogDebug(R"([{}] Dependency "{}" from "{}" of "{}" added to "{}" of "{}".)",
+                                         ExtensionName, dependencyPathStr, patchDefinition->name.ToString(),
+                                         patchPathStr, existingDefinition->name.ToString(), targetPathStr);
                             }
                         }
                     }
@@ -479,9 +483,9 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                     {
                         existingDefinition->visualTags.Add(patchDefinition->visualTags);
 
-                        LogInfo(R"([{}] Visual tags of "{}" from "{}" merged into "{}" from "{}".)",
-                                ExtensionName, patchDefinition->name.ToString(), patchPathStr,
-                                existingDefinition->name.ToString(), targetPathStr);
+                        LogDebug(R"([{}] Visual tags of "{}" from "{}" merged into "{}" from "{}".)",
+                                 ExtensionName, patchDefinition->name.ToString(), patchPathStr,
+                                 existingDefinition->name.ToString(), targetPathStr);
                     }
 
                     if (!isMultiTargetPatch)
@@ -495,8 +499,8 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
                     aResource->appearances.EmplaceBack(patchDefinition);
                     newAppearances.insert(patchDefinition->name);
 
-                    LogInfo(R"([{}] Appearance "{}" from "{}" added to "{}".)",
-                            ExtensionName, patchDefinition->name.ToString(), patchPathStr, targetPathStr);
+                    LogDebug(R"([{}] Appearance "{}" from "{}" added to "{}".)",
+                             ExtensionName, patchDefinition->name.ToString(), patchPathStr, targetPathStr);
                 }
             }
         }
@@ -507,8 +511,8 @@ void App::ResourcePatchExtension::OnAppearanceResourceLoad(Red::AppearanceResour
             {
                 aResource->censorshipMapping.PushBack(censorship);
 
-                LogInfo(R"([{}] Censorship "{}" from "{}" added to "{}".)",
-                        ExtensionName, censorship.Original.ToString(), patchPathStr, targetPathStr);
+                LogDebug(R"([{}] Censorship "{}" from "{}" added to "{}".)",
+                         ExtensionName, censorship.Original.ToString(), patchPathStr, targetPathStr);
             }
         }
     }
@@ -588,14 +592,14 @@ void App::ResourcePatchExtension::OnMeshResourceLoad(Red::CMesh* aMesh, Red::Pos
                     {
                         aMesh->appearances.EmplaceBack(cloneAppearance);
 
-                        LogInfo(R"([{}] Appearance "{}" from "{}" added to "{}".)",
-                                ExtensionName, patchAppearance->name.ToString(), patchPathStr, targetPathStr);
+                        LogDebug(R"([{}] Appearance "{}" from "{}" added to "{}".)",
+                                 ExtensionName, patchAppearance->name.ToString(), patchPathStr, targetPathStr);
                     }
                     else
                     {
-                        LogInfo(R"([{}] Appearance "{}" from "{}" replaced appearance "{}" of "{}".)",
-                                ExtensionName, patchAppearance->name.ToString(), patchPathStr,
-                                patchAppearance->name.ToString(), targetPathStr);
+                        LogDebug(R"([{}] Appearance "{}" from "{}" replaced appearance "{}" of "{}".)",
+                                 ExtensionName, patchAppearance->name.ToString(), patchPathStr,
+                                 patchAppearance->name.ToString(), targetPathStr);
                     }
                 }
 
@@ -625,8 +629,8 @@ void App::ResourcePatchExtension::OnMeshResourceLoad(Red::CMesh* aMesh, Red::Pos
                     aMesh->isPlayerShadowMesh = patchMesh->isPlayerShadowMesh;
                     aMesh->constrainAutoHideDistanceToTerrainHeightMap = patchMesh->constrainAutoHideDistanceToTerrainHeightMap;
 
-                    LogInfo(R"([{}] Render blob from "{}" replaced render blob of "{}".)",
-                            ExtensionName, patchPathStr, targetPathStr);
+                    LogDebug(R"([{}] Render blob from "{}" replaced render blob of "{}".)",
+                             ExtensionName, patchPathStr, targetPathStr);
                 }
             }
         }
@@ -657,32 +661,32 @@ void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh
         {
             aMorphTarget->baseMesh = patchResource->baseMesh;
 
-            LogInfo(R"([{}] Base mesh from "{}" replaced base mesh of "{}".)",
-                    ExtensionName, patchPathStr, targetPathStr);
+            LogDebug(R"([{}] Base mesh from "{}" replaced base mesh of "{}".)",
+                     ExtensionName, patchPathStr, targetPathStr);
         }
 
         if (patchInstance->Modifies(MorphTargetMeshAppProp, !patchResource->baseMeshAppearance))
         {
             aMorphTarget->baseMeshAppearance = patchResource->baseMeshAppearance;
 
-            LogInfo(R"([{}] Base mesh appearance from "{}" replaced base mesh appearance of "{}".)",
-                    ExtensionName, patchPathStr, targetPathStr);
+            LogDebug(R"([{}] Base mesh appearance from "{}" replaced base mesh appearance of "{}".)",
+                     ExtensionName, patchPathStr, targetPathStr);
         }
 
         if (patchInstance->Modifies(MorphTargetTextureProp, !patchResource->baseTexture.path))
         {
             aMorphTarget->baseTexture = patchResource->baseTexture;
 
-            LogInfo(R"([{}] Base texture from "{}" replaced base texture of "{}".)",
-                    ExtensionName, patchPathStr, targetPathStr);
+            LogDebug(R"([{}] Base texture from "{}" replaced base texture of "{}".)",
+                     ExtensionName, patchPathStr, targetPathStr);
         }
 
         if (patchInstance->Modifies(MorphTargetTextureParamProp, !patchResource->baseTextureParamName))
         {
             aMorphTarget->baseTextureParamName = patchResource->baseTextureParamName;
 
-            LogInfo(R"([{}] Base texture param "{}" replaced base texture param of "{}".)",
-                    ExtensionName, patchPathStr, targetPathStr);
+            LogDebug(R"([{}] Base texture param from "{}" replaced base texture param of "{}".)",
+                     ExtensionName, patchPathStr, targetPathStr);
         }
 
         if (patchResource->blob && patchInstance->Modifies(MorphTargetBlobProp, aMorphTarget->blob))
@@ -691,8 +695,8 @@ void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh
             {
                 aMorphTarget->blob = CopyRenderBlob(renderBlob);
 
-                LogInfo(R"([{}] Render blob from "{}" replaced render blob of "{}".)",
-                        ExtensionName, patchPathStr, targetPathStr);
+                LogDebug(R"([{}] Render blob from "{}" replaced render blob of "{}".)",
+                         ExtensionName, patchPathStr, targetPathStr);
             }
         }
 
@@ -701,8 +705,8 @@ void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh
         {
             aMorphTarget->boundingBox = patchResource->boundingBox;
 
-            LogInfo(R"([{}] Bounding box from "{}" replaced bounding box of "{}".)",
-                    ExtensionName, patchPathStr, targetPathStr);
+            LogDebug(R"([{}] Bounding box from "{}" replaced bounding box of "{}".)",
+                     ExtensionName, patchPathStr, targetPathStr);
         }
 
         if (patchInstance->Modifies(MorphTargetTargetsProp))
@@ -725,14 +729,14 @@ void App::ResourcePatchExtension::OnMorphTargetResourceLoad(Red::MorphTargetMesh
                 {
                     aMorphTarget->targets.EmplaceBack(patchTarget);
 
-                    LogInfo(R"([{}] Morph target "{}" from "{}" added to "{}".)",
-                            ExtensionName, patchTarget.name.ToString(), patchPathStr, targetPathStr);
+                    LogDebug(R"([{}] Morph target "{}" from "{}" added to "{}".)",
+                             ExtensionName, patchTarget.name.ToString(), patchPathStr, targetPathStr);
                 }
                 else
                 {
-                    LogInfo(R"([{}] Morph target "{}" from "{}" replaced morph target "{}" of "{}".)",
-                            ExtensionName, patchTarget.name.ToString(), patchPathStr,
-                            patchTarget.name.ToString(), targetPathStr);
+                    LogDebug(R"([{}] Morph target "{}" from "{}" replaced morph target "{}" of "{}".)",
+                             ExtensionName, patchTarget.name.ToString(), patchPathStr,
+                             patchTarget.name.ToString(), targetPathStr);
                 }
             }
         }
@@ -762,10 +766,11 @@ void App::ResourcePatchExtension::DispatchEntityPackagePatches(Red::JobQueue& aJ
                                                                const Red::WeakPtr<Red::EntityBuilder>& aBuilderWeak)
 {
     aJobQueue.Dispatch([entityBuilderWeak = aBuilderWeak](const Red::JobGroup& aJobGroup) {
-        if (entityBuilderWeak.Expired())
+        auto entityBuilder = entityBuilderWeak.Lock();
+
+        if (!entityBuilder)
             return;
 
-        auto& entityBuilder = entityBuilderWeak.instance;
         auto forceParts = entityBuilder->entityTemplate->visualTagsSchema &&
                           entityBuilder->entityTemplate->visualTagsSchema->visualTags.Contains(AppearancePartsTag);
 
@@ -799,10 +804,10 @@ void App::ResourcePatchExtension::DispatchEntityPackagePatches(Red::JobQueue& aJ
     });
 
     aJobQueue.Dispatch([entityBuilderWeak = aBuilderWeak](const Red::JobGroup& aJobGroup) {
-        if (entityBuilderWeak.Expired())
-            return;
+        auto entityBuilder = entityBuilderWeak.Lock();
 
-        auto& entityBuilder = entityBuilderWeak.instance;
+        if (!entityBuilder)
+            return;
 
         if (entityBuilder->flags.ExtractEntity && entityBuilder->entityExtractor)
         {
@@ -1320,20 +1325,20 @@ void App::ResourcePatchExtension::MergeComponents(Red::DynArray<Red::Handle<Red:
                 {
                     if (aPatchDefinition)
                     {
-                        LogInfo(R"([{}] Component "{}" from "{}" of "{}" added to "{}" of "{}".)", ExtensionName,
-                                patchComponent->name.ToString(), aPatchDefinition.ToString(), patchPathStr,
-                                aTargetDefinition.ToString(), targetPathStr);
+                        LogDebug(R"([{}] Component "{}" from "{}" of "{}" added to "{}" of "{}".)", ExtensionName,
+                                 patchComponent->name.ToString(), aPatchDefinition.ToString(), patchPathStr,
+                                 aTargetDefinition.ToString(), targetPathStr);
                     }
                     else if (aTargetDefinition)
                     {
-                        LogInfo(R"([{}] Component "{}" from "{}" added to "{}" of "{}".)", ExtensionName,
-                                patchComponent->name.ToString(), patchPathStr, aTargetDefinition.ToString(),
-                                targetPathStr);
+                        LogDebug(R"([{}] Component "{}" from "{}" added to "{}" of "{}".)", ExtensionName,
+                                 patchComponent->name.ToString(), patchPathStr, aTargetDefinition.ToString(),
+                                 targetPathStr);
                     }
                     else
                     {
-                        LogInfo(R"([{}] Component "{}" from "{}" added to "{}".)", ExtensionName,
-                                patchComponent->name.ToString(), patchPathStr, targetPathStr);
+                        LogDebug(R"([{}] Component "{}" from "{}" added to "{}".)", ExtensionName,
+                                 patchComponent->name.ToString(), patchPathStr, targetPathStr);
                     }
 
                     aResultObjects.PushBack(std::move(patchComponent));
@@ -1343,20 +1348,20 @@ void App::ResourcePatchExtension::MergeComponents(Red::DynArray<Red::Handle<Red:
             {
                 if (aPatchDefinition)
                 {
-                    LogInfo(R"([{}] Component "{}" from "{}" of "{}" replaced component in "{}" of "{}".)", ExtensionName,
-                            patchComponent->name.ToString(), aPatchDefinition.ToString(), patchPathStr,
-                            aTargetDefinition.ToString(), targetPathStr);
+                    LogDebug(R"([{}] Component "{}" from "{}" of "{}" replaced component in "{}" of "{}".)", ExtensionName,
+                             patchComponent->name.ToString(), aPatchDefinition.ToString(), patchPathStr,
+                             aTargetDefinition.ToString(), targetPathStr);
                 }
                 else if (aTargetDefinition)
                 {
-                    LogInfo(R"([{}] Component "{}" from "{}" replaced component in "{}" of "{}".)", ExtensionName,
-                            patchComponent->name.ToString(), patchPathStr, aTargetDefinition.ToString(),
-                            targetPathStr);
+                    LogDebug(R"([{}] Component "{}" from "{}" replaced component in "{}" of "{}".)", ExtensionName,
+                             patchComponent->name.ToString(), patchPathStr, aTargetDefinition.ToString(),
+                             targetPathStr);
                 }
                 else
                 {
-                    LogInfo(R"([{}] Component "{}" from "{}" replaced component in "{}".)", ExtensionName,
-                            patchComponent->name.ToString(), patchPathStr, targetPathStr);
+                    LogDebug(R"([{}] Component "{}" from "{}" replaced component in "{}".)", ExtensionName,
+                             patchComponent->name.ToString(), patchPathStr, targetPathStr);
                 }
             }
         }

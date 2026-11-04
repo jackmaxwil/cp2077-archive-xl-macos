@@ -3,8 +3,12 @@
 #include <filesystem>
 #include <vector>
 
+#if defined(_WIN32)
 #include <libloaderapi.h>
 #include <minwindef.h>
+#else
+#include <dlfcn.h>
+#endif
 
 #include <RED4ext/Callback.hpp>
 #include <RED4ext/Memory/Allocators.hpp>
@@ -60,12 +64,33 @@ public:
 private:
     ArchiveXL() = default;
 
+    // The allocator is ready once the PoolEngine pool is in the vault's pool registry.
+    inline static RED4ext::Memory::Vault* GetVault()
+    {
+#if defined(_WIN32)
+        return RED4ext::Memory::Vault::Get();
+#else
+        // Vault::Get() cannot be used on macOS, so the vault is taken from the game's
+        // PoolStorageProxy<PoolEngine>::GetAllocator(). That storage is set up when the game image loads and its
+        // allocator is the DefaultAllocator, the first member of the vault. The getter only reads that static and
+        // allocates nothing, so it is safe at any time.
+        using GetVault_t = RED4ext::Memory::Vault* (*)();
+
+        static const auto getVault = reinterpret_cast<GetVault_t>(
+            dlsym(RTLD_MAIN_ONLY, "_ZN3red6memory16PoolStorageProxyINS_10PoolEngineEE12GetAllocatorEv"));
+
+        return getVault ? getVault() : nullptr;
+#endif
+    }
+
     inline static bool Initialize()
     {
         if (s_facade)
             return true;
 
-        if (!RED4ext::Memory::Vault::Get()->poolRegistry.Get(RED4ext::Memory::PoolEngine::Name))
+        auto vault = GetVault();
+
+        if (!vault || !vault->poolRegistry.Get(RED4ext::Memory::PoolEngine::Name))
             return false;
 
         auto facade = RED4ext::CRTTISystem::Get()->GetClass("ArchiveXL");
@@ -131,10 +156,22 @@ private:
 
     inline static std::filesystem::path GetModulePath(HMODULE aHandle)
     {
+#if defined(_WIN32)
         wchar_t path[MAX_PATH]{0};
         auto length = GetModuleFileNameW(aHandle, path, MAX_PATH);
 
         return std::filesystem::path(path).parent_path();
+#else
+        // The plugin that includes this header: find the image that holds this function.
+        (void)aHandle;
+        Dl_info info{};
+        if (dladdr(reinterpret_cast<const void*>(&GetModulePath), &info) && info.dli_fname)
+        {
+            return std::filesystem::path(info.dli_fname).parent_path();
+        }
+
+        return {};
+#endif
     }
 
     inline static RED4ext::CClass* s_facade;

@@ -31,7 +31,6 @@ bool App::MeshExtension::Load()
     s_dummyMesh = Red::MakeHandle<Red::CMesh>();
     s_dummyAppearance = Red::MakeHandle<Red::meshMeshAppearance>();
     s_dummyMaterial = Red::MakeHandle<Red::CMaterialInstance>();
-    s_tempMaterial = Red::MakeHandle<Red::CMaterialInstance>();
 
     Raw::MeshAppearance::Owner::Set(s_dummyAppearance.instance, s_dummyMesh);
     Red::CNamePool::Add("@material");
@@ -82,21 +81,36 @@ void App::MeshExtension::OnFindAppearance(Red::Handle<Red::meshMeshAppearance>& 
         return;
     }
 
-    if (auto meshState = FindMeshState(aMesh))
-    {
-        std::unique_lock _(meshState->meshMutex);
-
-        ProcessAppearance(aMesh, meshState, aAppearance);
-    }
+    ProcessAppearance(aMesh, aAppearance);
 }
 
-void App::MeshExtension::ProcessAppearance(Red::CMesh* aMesh, const Core::SharedPtr<MeshState>& aMeshState,
-                                           const Red::Handle<Red::meshMeshAppearance>& aAppearance)
+void App::MeshExtension::ProcessAppearance(Red::CMesh* aMesh, const Red::Handle<Red::meshMeshAppearance>& aAppearance)
 {
+    std::unique_lock appearanceLock(Raw::MeshAppearance::MaterialLock::Ref(aAppearance));
+
     if (aAppearance->chunkMaterials.IsEmpty())
     {
         auto expansionName = ResourcePatchExtension::GetExpansionName(aAppearance);
-        auto expansionIndex = aMeshState->GetExpansionIndex(expansionName);
+        auto expansionIndex = 0;
+
+        if (auto meshState = FindMeshState(aMesh))
+        {
+            std::unique_lock stateLock(meshState->meshMutex);
+
+            expansionIndex = meshState->GetExpansionIndex(expansionName);
+        }
+        else if (expansionName)
+        {
+            for (auto i = 0; i < aMesh->appearances.Size(); ++i)
+            {
+                if (aMesh->appearances[i]->name == expansionName)
+                {
+                    expansionIndex = i;
+                    break;
+                }
+            }
+        }
+
         auto expansionAppearance = aMesh->appearances[expansionIndex];
 
         if (expansionAppearance && expansionAppearance != aAppearance)
@@ -126,8 +140,8 @@ void App::MeshExtension::ProcessAppearance(Red::CMesh* aMesh, const Core::Shared
 
             auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aMesh->path);
 
-            LogInfo(R"([{}] Appearance "{}" of "{}" has been expanded using "{}".)",
-                    ExtensionName, aAppearance->name.ToString(), meshPathStr, expansionAppearance->name.ToString());
+            LogDebug(R"([{}] Appearance "{}" of "{}" has been expanded using "{}".)",
+                     ExtensionName, aAppearance->name.ToString(), meshPathStr, expansionAppearance->name.ToString());
         }
         else if (aAppearance->name != DefaultAppearanceName)
         {
@@ -149,25 +163,9 @@ void App::MeshExtension::ProcessAppearance(Red::CMesh* aMesh, const Core::Shared
 
             aAppearance->tags.Clear();
         }
-
-        aMeshState->FillMaterials(aMesh);
-
-        for (const auto chunkName : aAppearance->chunkMaterials)
-        {
-            if (!aMeshState->HasMaterialEntry(chunkName))
-            {
-                auto materialIndex = static_cast<int32_t>(aMesh->materialEntries.Size());
-                aMeshState->AddMaterialEntry(chunkName, materialIndex);
-                aMesh->materialEntries.EmplaceBack();
-
-                auto& materialEntry = aMesh->materialEntries.Back();
-                materialEntry.name = chunkName;
-                materialEntry.isLocalInstance = true;
-                materialEntry.material = s_tempMaterial;
-                materialEntry.materialWeak = s_tempMaterial;
-            }
-        }
     }
+
+    FillMissingMaterials(aMesh, aAppearance);
 }
 
 void App::MeshExtension::OnAddStubAppearance(Red::CMesh* aMesh)
@@ -180,28 +178,13 @@ void App::MeshExtension::OnAddStubAppearance(Red::CMesh* aMesh)
 
 bool App::MeshExtension::OnPreloadAppearances(Red::CMesh* aMesh)
 {
-    if (!aMesh || !aMesh->path || aMesh->appearances.IsEmpty() || aMesh->materialEntries.IsEmpty() ||
-        aMesh->appearances[0]->chunkMaterials.IsEmpty())
+    if (!aMesh || !aMesh->path || aMesh->appearances.IsEmpty() || aMesh->materialEntries.IsEmpty())
         return false;
 
-    const auto preload = Raw::CMesh::ShouldPreloadAppearances(aMesh);
+    if (aMesh->appearances[0]->chunkMaterials.IsEmpty() || HasMeshState(aMesh))
+        return false;
 
-    if (preload)
-    {
-        return !HasMeshState(aMesh);
-
-        // if (auto meshState = FindMeshState(aMesh))
-        // {
-        //     std::unique_lock _(meshState->meshMutex);
-        //
-        //     for (const auto& appearance : aMesh->appearances)
-        //     {
-        //         ProcessAppearance(aMesh, meshState, appearance);
-        //     }
-        // }
-    }
-
-    return preload;
+    return aMesh->forceLoadAllAppearances || aMesh->appearances.Size() == 1;
 }
 
 #ifdef __APPLE__
@@ -227,14 +210,14 @@ void App::MeshExtension::PatchLoadedMaterials(Red::CMesh* aTargetMesh, Red::Mesh
                                               const Red::DynArray<Red::CName>& aMaterialNames)
 {
     if (!aTargetMesh->path || aMaterialNames.IsEmpty() || !aToken.data ||
-        aToken.data->materials.Size() != aMaterialNames.Size() || !ContainsUnresolvedMaterials(aToken.data->materials))
+        aToken.data->materials.Size() != aMaterialNames.Size() || !HasUnresolvedMaterials(aToken.data->materials))
         return;
 
     Red::JobQueue jobQueue;
     jobQueue.Wait(aToken.job);
     jobQueue.Dispatch([targetMeshWeak = Red::AsWeakHandle(aTargetMesh), materialNames = aMaterialNames,
                        materialData = aToken.data](const Red::JobGroup& aJobGroup) {
-        if (!ContainsUnresolvedMaterials(materialData->materials))
+        if (!HasUnresolvedMaterials(materialData->materials))
             return;
 
         auto targetMesh = targetMeshWeak.Lock();
@@ -321,16 +304,6 @@ void App::MeshExtension::ProcessDynamicMaterials(const Core::SharedPtr<DynamicCo
         {
             if (chunkName.hash == aContext->sourceMesh->path.hash)
             {
-                auto sourceTagIndex = static_cast<int32_t>(aContext->targetMesh->materialEntries.Size());
-                aContext->targetState->materials[chunkName] = sourceTagIndex;
-                aContext->targetMesh->materialEntries.EmplaceBack();
-
-                auto& materialEntry = aContext->targetMesh->materialEntries.Back();
-                materialEntry.name = chunkName;
-                materialEntry.isLocalInstance = true;
-                materialEntry.material = s_dummyMaterial;
-                materialEntry.materialWeak = s_dummyMaterial;
-
                 const auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->targetMesh->path);
                 const auto sourcePathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->sourceMesh->path);
 
@@ -346,7 +319,7 @@ void App::MeshExtension::ProcessDynamicMaterials(const Core::SharedPtr<DynamicCo
             continue;
         }
 
-        if (aContext->targetMesh->materialEntries[materialIndex].material != s_tempMaterial)
+        if (!IsUnresolvedMaterial(aContext->targetMesh->materialEntries[materialIndex].material))
             continue;
 
         if (chunkName.hash == aContext->sourceMesh->path.hash)
@@ -362,16 +335,16 @@ void App::MeshExtension::ProcessDynamicMaterials(const Core::SharedPtr<DynamicCo
         // {
         //     const auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->targetMesh->path);
         //
-        //     LogInfo(R"([{}] Resolving material "{}" for "{}"...)",
-        //             ExtensionName, chunkName.ToString(), meshPathStr);
+        //     LogDebug(R"([{}] Resolving material "{}" for "{}"...)",
+        //              ExtensionName, chunkName.ToString(), meshPathStr);
         // }
         // else
         // {
         //     const auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->targetMesh->path);
         //     const auto sourcePathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->sourceMesh->path);
         //
-        //     LogInfo(R"([{}] Resolving material "{}" for "{}" using source "{}"...)",
-        //             ExtensionName, chunkName.ToString(), meshPathStr, sourcePathStr);
+        //     LogDebug(R"([{}] Resolving material "{}" for "{}" using source "{}"...)",
+        //              ExtensionName, chunkName.ToString(), meshPathStr, sourcePathStr);
         // }
 
         auto chunk = Core::MakeShared<ChunkData>();
@@ -380,7 +353,7 @@ void App::MeshExtension::ProcessDynamicMaterials(const Core::SharedPtr<DynamicCo
         chunk->templateName = chunkName;
         chunk->sourceIndex = aContext->sourceState->GetMaterialEntryIndex(chunkName);
 
-        if (chunk->sourceIndex < 0 || aContext->sourceMesh->materialEntries[chunk->sourceIndex].material == s_tempMaterial)
+        if (chunk->sourceIndex < 0 || IsDummyMaterial(aContext->sourceMesh->materialEntries[chunk->sourceIndex].material))
         {
             auto chunkMaterialNameStr = std::string_view(chunkName.ToString());
             auto templateNamePos = chunkMaterialNameStr.find(TemplateMaterialMarker);
@@ -576,16 +549,16 @@ void App::MeshExtension::FinalizeDynamicMaterial(const Core::SharedPtr<DynamicCo
         {
             const auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->targetMesh->path);
 
-            LogInfo(R"([{}] Material "{}" of "{}" has been successfully instantiated.)",
-                    ExtensionName, aChunk->chunkName.ToString(), meshPathStr);
+            LogDebug(R"([{}] Material "{}" of "{}" has been successfully instantiated.)",
+                     ExtensionName, aChunk->chunkName.ToString(), meshPathStr);
         }
         else
         {
             const auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->targetMesh->path);
             const auto sourcePathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->sourceMesh->path);
 
-            LogInfo(R"([{}] Material "{}" of "{}" has been successfully instantiated using source "{}".)",
-                    ExtensionName, aChunk->chunkName.ToString(), meshPathStr, sourcePathStr);
+            LogDebug(R"([{}] Material "{}" of "{}" has been successfully instantiated using source "{}".)",
+                     ExtensionName, aChunk->chunkName.ToString(), meshPathStr, sourcePathStr);
         }
     }
     else
@@ -606,16 +579,16 @@ void App::MeshExtension::FinalizeDynamicMaterial(const Core::SharedPtr<DynamicCo
             {
                 const auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->targetMesh->path);
 
-                LogInfo(R"([{}] Material "{}" of "{}" has been successfully instantiated.)",
-                        ExtensionName, aChunk->chunkName.ToString(), meshPathStr);
+                LogDebug(R"([{}] Material "{}" of "{}" has been successfully instantiated.)",
+                         ExtensionName, aChunk->chunkName.ToString(), meshPathStr);
             }
             else
             {
                 const auto meshPathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->targetMesh->path);
                 const auto sourcePathStr = s_resourcePathRegistry->ResolvePathOrHash(aContext->sourceMesh->path);
 
-                LogInfo(R"([{}] Material "{}" of "{}" has been successfully instantiated using source "{}".)",
-                        ExtensionName, aChunk->chunkName.ToString(), meshPathStr, sourcePathStr);
+                LogDebug(R"([{}] Material "{}" of "{}" has been successfully instantiated using source "{}".)",
+                         ExtensionName, aChunk->chunkName.ToString(), meshPathStr, sourcePathStr);
             }
         });
     }
@@ -966,10 +939,65 @@ void App::MeshExtension::FillFinalMaterials(const Core::SharedPtr<DynamicContext
     }
 }
 
-bool App::MeshExtension::ContainsUnresolvedMaterials(const Red::DynArray<Red::Handle<Red::IMaterial>>& aMaterials)
+bool App::MeshExtension::IsDummyMaterial(const Red::Handle<Red::IMaterial>& aMaterial)
 {
-    return std::ranges::any_of(aMaterials,
-                               [](const auto& aMaterial) { return !aMaterial || aMaterial == s_tempMaterial; });
+    return aMaterial && !aMaterial->baseMaterial.path;
+}
+
+bool App::MeshExtension::IsUnresolvedMaterial(const Red::Handle<Red::IMaterial>& aMaterial)
+{
+    return !aMaterial || !aMaterial->baseMaterial.path;
+}
+
+bool App::MeshExtension::HasUnresolvedMaterials(const Red::DynArray<Red::Handle<Red::IMaterial>>& aMaterials)
+{
+    return std::ranges::any_of(aMaterials, IsUnresolvedMaterial);
+}
+
+void App::MeshExtension::FillMissingMaterials(Red::CMesh* aMesh,
+                                              const Red::Handle<Red::meshMeshAppearance>& aAppearance)
+{
+    Core::SortedSet<Red::CName> neededMaterials;
+    Core::SortedSet<Red::CName> existingMaterials;
+    Core::Set<Red::CName> missingMaterials;
+
+    for (auto& chunkMaterial : aAppearance->chunkMaterials)
+    {
+        neededMaterials.insert(chunkMaterial);
+    }
+
+    {
+        std::shared_lock meshMaterialLock(Raw::CMesh::MaterialLock::Ref(aMesh));
+
+        for (auto& materialEntry : aMesh->materialEntries)
+        {
+            existingMaterials.insert(materialEntry.name);
+        }
+    }
+
+    std::set_difference(
+        neededMaterials.begin(), neededMaterials.end(),
+        existingMaterials.begin(), existingMaterials.end(),
+        std::inserter(missingMaterials, missingMaterials.begin())
+    );
+
+    if (!missingMaterials.empty())
+    {
+        std::unique_lock _(Raw::CMesh::MaterialLock::Ref(aMesh));
+
+        aMesh->materialEntries.Reserve(aMesh->materialEntries.Size() + missingMaterials.size());
+
+        for (auto& missingMaterial : missingMaterials)
+        {
+            aMesh->materialEntries.EmplaceBack();
+
+            auto& materialEntry = aMesh->materialEntries.Back();
+            materialEntry.name = missingMaterial;
+            materialEntry.isLocalInstance = true;
+            materialEntry.material = s_dummyMaterial;
+            materialEntry.materialWeak = s_dummyMaterial;
+        }
+    }
 }
 
 bool App::MeshExtension::IsDynamicMesh(Red::CMesh* aMesh)
@@ -1081,10 +1109,9 @@ Red::CName App::MeshExtension::RegisterMeshPatch(Red::CMesh* aMesh, Red::CMesh* 
 
     if (!aMesh->materialEntries.IsEmpty())
     {
-        std::scoped_lock _(meshState->meshMutex);
+        std::scoped_lock _(meshState->meshMutex, Raw::CMesh::MaterialLock::Ref(aMesh));
 
         auto materialIndex = static_cast<int32_t>(aMesh->materialEntries.Size());
-        meshState->materials[sourceTag] = materialIndex;
         aMesh->materialEntries.EmplaceBack();
 
         auto& materialEntry = aMesh->materialEntries.Back();
@@ -1092,6 +1119,8 @@ Red::CName App::MeshExtension::RegisterMeshPatch(Red::CMesh* aMesh, Red::CMesh* 
         materialEntry.isLocalInstance = true;
         materialEntry.material = s_dummyMaterial;
         materialEntry.materialWeak = s_dummyMaterial;
+
+        meshState->materials[sourceTag] = materialIndex;
     }
 
     return sourceTag;
@@ -1254,6 +1283,8 @@ void App::MeshExtension::MeshState::FillAppearances(Red::CMesh* aMesh)
 
 void App::MeshExtension::MeshState::FillMaterials(Red::CMesh* aMesh)
 {
+    std::shared_lock _(Raw::CMesh::MaterialLock::Ref(aMesh));
+
     materials.clear();
 
     for (auto i = 0; i < aMesh->materialEntries.Size(); ++i)

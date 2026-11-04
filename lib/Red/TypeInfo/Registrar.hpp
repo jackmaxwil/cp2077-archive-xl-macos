@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __APPLE__
+#include <pthread.h>
+#endif
+
 namespace Red
 {
 class TypeInfoRegistrar
@@ -15,6 +19,9 @@ public:
 
     static inline void RegisterDiscovered()
     {
+        // Assumed to be called at plugin bootstrap, on the game's main thread.
+        s_mainThread = CurrentThreadId();
+
         QueuePendingRegisterCallbacks();
         QueuePendingDescribeCallbacks();
     }
@@ -35,7 +42,23 @@ public:
         }
     }
 
+    static inline bool IsMainThread()
+    {
+        const auto mainThread = s_mainThread.load();
+
+        return mainThread == 0 || mainThread == CurrentThreadId();
+    }
+
 private:
+    static inline uint32_t CurrentThreadId()
+    {
+#ifdef __APPLE__
+        return pthread_mach_thread_np(pthread_self());
+#else
+        return GetCurrentThreadId();
+#endif
+    }
+
     static inline void QueuePendingRegisterCallbacks()
     {
         if (!s_registerCallbacks.empty())
@@ -84,5 +107,6 @@ private:
 
     static inline std::vector<Callback> s_registerCallbacks;
     static inline std::vector<Callback> s_describeCallbacks;
+    static inline std::atomic<uint32_t> s_mainThread{0};
 };
 }

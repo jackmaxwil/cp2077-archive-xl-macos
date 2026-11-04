@@ -1,14 +1,14 @@
 # ArchiveXL for macOS
 
 A port of [ArchiveXL](https://github.com/psiberx/cp2077-archive-xl) by psiberx to the native macOS version of
-Cyberpunk 2077 2.3.1 (Apple silicon, Steam). ArchiveXL is a RED4ext plugin that lets mods add and extend game
+Cyberpunk 2077 2.5.0 (Apple silicon, Steam). ArchiveXL is a RED4ext plugin that lets mods add and extend game
 resources (appearances, garments, localization, factories, world streaming, and more) through `.xl` files, without
 overwriting base game files. It runs in game on macOS; every game address it uses is verified in the RED4ext.SDK
 address database.
 
 ## Install
 
-ArchiveXL is part of the RED4ext macOS release (Cyberpunk 2077 2.3.1, Steam, Apple silicon). Quit the game, open Terminal
+ArchiveXL is part of the RED4ext macOS release (Cyberpunk 2077 2.5.0, Steam, Apple silicon). Quit the game, open Terminal
 and run:
 
 ```bash

@@ -131,7 +131,7 @@ constexpr auto GetResource = Core::RawFunc<
 // bit 0 = NotSorted), built by 0x102463CB8; see RED4ext.SDK docs/re/charcustom.md.
 using StateOptions = Red::Map<Red::CName, uint64_t>;
 #else
-using StateOptions = Red::SortedUniqueArray<Red::CName>;
+using StateOptions = Red::Map<Red::CName, Red::CName>;
 #endif
 
 constexpr auto InitializeAppOption = Core::RawFunc<

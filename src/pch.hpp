@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <concepts>
 #include <cstdint>
 #include <filesystem>
@@ -47,6 +48,7 @@
 #include <RED4ext/Scripting/Natives/Generated/ent/Entity.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ent/EntityID.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ent/EntityInstanceData.hpp>
+#include <RED4ext/Scripting/Natives/Generated/ent/EntityParameter.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ent/EntityParametersStorage.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ent/EntityTemplate.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ent/ExternalComponent.hpp>
@@ -151,6 +153,13 @@
 #include <RED4ext/Scripting/Natives/Generated/world/AreaShapeNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/AudioTagNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/CollisionNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/CookedAcousticSectorNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/CookedCollisionNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/CookedGenericProxyMeshNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/CookedMeshNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/CookedNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/CookedStaticDecalNode.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/CookedStaticMeshNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/EffectNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/EntityNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/EnvironmentAreaParameters.hpp>
@@ -169,7 +178,6 @@
 #include <RED4ext/Scripting/Natives/Generated/world/PrefabProxyMeshNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/RuntimeSystemEntityAppearanceChanger.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/RuntimeSystemWorldStreaming.hpp>
-#include <RED4ext/Scripting/Natives/Generated/world/SharedDataBuffer.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/StaticDecalNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/StaticMeshNode.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/StaticOccluderMeshNode.hpp>
