@@ -45,8 +45,9 @@ bool App::AttachmentExtension::Load()
 #ifndef __APPLE__
     // macOS: GetSuffixValue is inlined into GetSuffixes; see ApplyInnerSleevesSuffix.
     HookWrap<Raw::AppearanceChanger::GetSuffixValue>(&OnGetSuffixValue).OrThrow();
-#endif
+    // macOS: no 2.5.0 function is conclusively UpdateWithExclusiveLock (docs/re/port_2.5.0_plugins2.md, batch 1).
     Hook<Raw::AttachmentSlots::UpdateWithExclusiveLock>(&OnUpdateWithExclusiveLock).OrThrow();
+#endif
 
     {
         std::unique_lock _(s_slotsMutex);
@@ -73,8 +74,8 @@ bool App::AttachmentExtension::Unload()
     Unhook<Raw::CharacterCustomizationFeetController::CheckState>();
 #ifndef __APPLE__
     Unhook<Raw::AppearanceChanger::GetSuffixValue>();
-#endif
     Unhook<Raw::AttachmentSlots::UpdateWithExclusiveLock>();
+#endif
 
     return true;
 }
@@ -364,6 +365,7 @@ bool App::AttachmentExtension::OnGetSuffixValue(Raw::AppearanceChanger::GetSuffi
 }
 #endif
 
+#ifndef __APPLE__
 void* App::AttachmentExtension::OnUpdateWithExclusiveLock(void* a1, void* a2, void* a3, void* a4)
 {
     const auto previous = s_skipVisualTagCheck;
@@ -372,6 +374,7 @@ void* App::AttachmentExtension::OnUpdateWithExclusiveLock(void* a1, void* a2, vo
     s_skipVisualTagCheck = previous;
     return result;
 }
+#endif
 
 bool App::AttachmentExtension::IsVisualTagActive(Red::Handle<Red::Entity>& aOwner,
                                                  Red::TweakDBID aBaseSlotID, Red::CName aVisualTag,

@@ -28,7 +28,11 @@ private:
         Red::worldGlobalNodeRef resolved;
     };
 
+#ifdef __APPLE__
+    void OnLoadJournal(uintptr_t aTree, Red::JobGroup& aJobGroup);
+#else
     void OnLoadJournal(uintptr_t aTree, uintptr_t aIndexToken, Red::JobQueue& aJobQueue);
+#endif
 #ifdef __APPLE__
     void OnInitializeRoot(Red::game::JournalRootFolderEntry* aRoot, uintptr_t, Red::JobQueue& aJobQueue);
 #else

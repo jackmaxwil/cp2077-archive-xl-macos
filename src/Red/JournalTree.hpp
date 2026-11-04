@@ -4,7 +4,11 @@ namespace Raw::JournalTree
 {
 constexpr auto ProcessJournalIndex = Core::RawFunc<
     /* addr = */ Red::AddressLib::JournalTree_ProcessJournalIndex,
+#ifdef __APPLE__
+    /* type = */ void (*)(uintptr_t a1, Red::JobGroup& aJobGroup)>();
+#else
     /* type = */ void (*)(uintptr_t a1, uintptr_t a2, Red::JobQueue& aJobQueue)>();
+#endif
 }
 
 namespace Raw::JournalRootFolderEntry

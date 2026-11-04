@@ -146,7 +146,12 @@ constexpr uint32_t JournalManager_TrackQuest = 3274382593;
 
 constexpr uint32_t JournalRootFolderEntry_Initialize = 1945256833;
 
+#ifdef __APPLE__
+// macOS 2.5.0 keeps the 2.3.1 two-argument function (RED4ext.SDK docs/re/port_2.5.0_plugins2.md, batch 2).
+constexpr uint32_t JournalTree_ProcessJournalIndex = 837162664;
+#else
 constexpr uint32_t JournalTree_ProcessJournalIndex = 2052144225;
+#endif
 
 constexpr uint32_t Localization_LoadOnScreens = 3550098299;
 constexpr uint32_t Localization_LoadSubtitles = 772484645;

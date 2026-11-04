@@ -57,8 +57,14 @@ void App::JournalExtension::Reload()
     }
 }
 
+#ifdef __APPLE__
+void App::JournalExtension::OnLoadJournal(uintptr_t aTree, Red::JobGroup& aJobGroup)
+{
+    auto aJobQueue = Red::JobQueue(aJobGroup);
+#else
 void App::JournalExtension::OnLoadJournal(uintptr_t aTree, uintptr_t aIndexToken, Red::JobQueue& aJobQueue)
 {
+#endif
     LogInfo("[{}] Journal tree is initializing...", ExtensionName);
 
     if (m_configs.empty())
